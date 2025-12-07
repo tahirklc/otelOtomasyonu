@@ -1,0 +1,3 @@
+tahir|tahir@gmail.com|1234|user
+admin|admin@otel.com|admin|admin
+kullanici|test@otel.com|1111|user
