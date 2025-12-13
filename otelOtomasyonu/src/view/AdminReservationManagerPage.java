@@ -1,12 +1,23 @@
 package view;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.List;
 
 import service.ReservationManager;
+import service.EmailService;
 import model.Reservation;
 
 public class AdminReservationManagerPage extends JFrame {
@@ -14,16 +25,50 @@ public class AdminReservationManagerPage extends JFrame {
     private DefaultTableModel model;
     private JTable table;
 
+    // --- RENK PALETİ ---
+    private final Color PRIMARY_COLOR = new Color(63, 81, 181); // İndigo
+    private final Color BG_COLOR = new Color(245, 247, 250);
+    private final Color SIDEBAR_BG = new Color(255, 255, 255);
+    
+    // Durum Renkleri
+    private final Color STATUS_GREEN = new Color(46, 125, 50);
+    private final Color STATUS_RED = new Color(198, 40, 40);
+    private final Color STATUS_ORANGE = new Color(239, 108, 0);
+
+    private final DateTimeFormatter STRICT_DATE =
+            DateTimeFormatter.ofPattern("dd.MM.uuuu")
+                    .withResolverStyle(ResolverStyle.STRICT);
+
     public AdminReservationManagerPage() {
 
-        setTitle("Admin - Rezervasyon Yönetimi");
-        setSize(1050, 500);
+        setTitle("Admin - Rezervasyon Yönetim Paneli");
+        setSize(1200, 700); // Daha geniş ekran
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        // ✅ ODA NO SÜTUNU EKLENDİ
-        String[] columns = {"Müşteri", "Oda", "Oda No", "Kişi Sayısı", "Giriş", "Çıkış", "Fiyat", "Durum"};
+        // Ana Konteyner
+        JPanel mainContainer = new JPanel(new BorderLayout());
+        mainContainer.setBackground(BG_COLOR);
+        setContentPane(mainContainer);
+
+        // 1. SOL TARAF: TABLO
+        setupTable();
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBorder(new EmptyBorder(20, 20, 20, 20)); // Tablo kenar boşluğu
+        scrollPane.getViewport().setBackground(Color.WHITE);
+        mainContainer.add(scrollPane, BorderLayout.CENTER);
+
+        // 2. SAĞ TARAF: KONTROL PANELİ (SIDEBAR)
+        JPanel controlPanel = createControlPanel();
+        mainContainer.add(controlPanel, BorderLayout.EAST);
+
+        // Verileri Yükle
+        tabloyuDoldur();
+    }
+
+    private void setupTable() {
+        String[] columns = {"Müşteri", "Oda Tipi", "Oda No", "Kişi", "Giriş", "Çıkış", "Fiyat", "Durum"};
         model = new DefaultTableModel(columns, 0);
 
         table = new JTable(model) {
@@ -32,54 +77,133 @@ public class AdminReservationManagerPage extends JFrame {
             }
         };
 
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        // Tablo Görsel Ayarları
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.setRowHeight(40);
+        table.setShowVerticalLines(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
+        table.setSelectionBackground(new Color(232, 240, 254)); // Seçim rengi
+        table.setSelectionForeground(Color.BLACK);
 
-        JPanel panel = new JPanel();
+        // Header
+        JTableHeader header = table.getTableHeader();
+        header.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        header.setBackground(PRIMARY_COLOR);
+        header.setForeground(Color.WHITE);
+        header.setPreferredSize(new Dimension(0, 45));
 
-        JButton btnOnayla   = new JButton("Onayla");
-        JButton btnReddet   = new JButton("Reddet");
-        JButton btnIptal    = new JButton("İptal Et");
-        JButton btnDetay    = new JButton("Detay Göster");
-        JButton btnGuncelle = new JButton("Rezervasyon Güncelle");
-        JButton btnYenile   = new JButton("Yenile");
+        // Hücreleri Ortala
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        for (int i = 0; i < table.getColumnCount(); i++) {
+            table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+        }
 
-        panel.add(btnOnayla);
-        panel.add(btnReddet);
-        panel.add(btnIptal);
-        panel.add(btnDetay);
-        panel.add(btnGuncelle);
-        panel.add(btnYenile);
+        // DURUM SÜTUNU (En sağdaki) - Özel Renklendirme
+        table.getColumnModel().getColumn(7).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                String status = (String) value;
+                setHorizontalAlignment(CENTER);
+                setFont(new Font("Segoe UI", Font.BOLD, 13));
 
-        add(panel, BorderLayout.SOUTH);
-
-        tabloyuDoldur();
-
-        btnOnayla.addActionListener(e -> durumDegistir("Onaylandı", false));
-        btnReddet.addActionListener(e -> durumDegistir("Reddedildi", true));
-        btnIptal.addActionListener(e -> durumDegistir("İptal Edildi", true));
-        btnDetay.addActionListener(e -> detayGoster());
-        btnGuncelle.addActionListener(e -> rezervasyonGuncelle());
-        btnYenile.addActionListener(e -> tabloyuDoldur());
+                if ("Onaylandı".equals(status)) setForeground(STATUS_GREEN);
+                else if ("Reddedildi".equals(status) || "İptal Edildi".equals(status)) setForeground(STATUS_RED);
+                else if ("Bekliyor".equals(status)) setForeground(STATUS_ORANGE);
+                else setForeground(Color.GRAY);
+                
+                return c;
+            }
+        });
     }
 
-    // ----------------------------------------------------
+    private JPanel createControlPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(SIDEBAR_BG);
+        panel.setPreferredSize(new Dimension(280, 0));
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(230, 230, 230), 1),
+                new EmptyBorder(20, 20, 20, 20)
+        ));
+
+        // Başlık
+        JLabel lblHeader = new JLabel("İşlemler");
+        lblHeader.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        lblHeader.setForeground(new Color(50, 50, 50));
+        lblHeader.setAlignmentX(Component.CENTER_ALIGNMENT);
+        panel.add(lblHeader);
+        panel.add(Box.createVerticalStrut(30));
+
+        // -- GRUP 1: ONAY SÜRECİ --
+        addSectionTitle(panel, "Durum Yönetimi");
+        
+        JButton btnOnayla = new ModernButton("✅ Onayla", STATUS_GREEN, Color.WHITE);
+        btnOnayla.addActionListener(e -> durumDegistir("Onaylandı", false));
+        panel.add(btnOnayla);
+        panel.add(Box.createVerticalStrut(10));
+
+        JButton btnReddet = new ModernButton("❌ Reddedildi", STATUS_RED, Color.WHITE);
+        btnReddet.addActionListener(e -> durumDegistir("Reddedildi", true));
+        panel.add(btnReddet);
+        panel.add(Box.createVerticalStrut(20));
+
+        // -- GRUP 2: DÜZENLEME --
+        addSectionTitle(panel, "Düzenleme");
+
+        JButton btnGuncelle = new ModernButton("✏️ Güncelle", PRIMARY_COLOR, Color.WHITE);
+        btnGuncelle.addActionListener(e -> rezervasyonGuncelle());
+        panel.add(btnGuncelle);
+        panel.add(Box.createVerticalStrut(10));
+
+        JButton btnIptal = new ModernButton("🚫 İptal Et", Color.GRAY, Color.WHITE);
+        btnIptal.addActionListener(e -> durumDegistir("İptal Edildi", true));
+        panel.add(btnIptal);
+        panel.add(Box.createVerticalStrut(20));
+
+        // -- GRUP 3: GÖRÜNÜM --
+        addSectionTitle(panel, "Görünüm");
+
+        JButton btnDetay = new ModernButton("📄 Detay Göster", new Color(0, 150, 136), Color.WHITE); // Teal
+        btnDetay.addActionListener(e -> detayGoster());
+        panel.add(btnDetay);
+        panel.add(Box.createVerticalStrut(10));
+
+        JButton btnYenile = new ModernButton("🔄 Tabloyu Yenile", new Color(255, 193, 7), Color.BLACK); // Amber
+        btnYenile.addActionListener(e -> tabloyuDoldur());
+        panel.add(btnYenile);
+
+        return panel;
+    }
+
+    private void addSectionTitle(JPanel panel, String title) {
+        JLabel lbl = new JLabel(title);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        lbl.setForeground(Color.GRAY);
+        lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+        panel.add(lbl);
+        panel.add(Box.createVerticalStrut(5));
+    }
+
+    // --- MANTIK METOTLARI (AYNEN KORUNDU) ---
+
     private Reservation getSecili() {
         int row = table.getSelectedRow();
         if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Rezervasyon seçiniz!");
+            JOptionPane.showMessageDialog(this, "Lütfen tablodan bir rezervasyon seçiniz!", "Seçim Yok", JOptionPane.WARNING_MESSAGE);
             return null;
         }
         return ReservationManager.getReservations().get(row);
     }
 
-    // ✅ ODA NO DA TABLOYA EKLENDİ
     private void tabloyuDoldur() {
         model.setRowCount(0);
         for (Reservation r : ReservationManager.getReservations()) {
             model.addRow(new Object[]{
                     r.getMusteriAdi(),
                     r.getOdaTipi(),
-                    r.getOdaNo(),          // ✅ ODA NUMARASI
+                    r.getOdaNo(),
                     r.getKisiSayisi(),
                     r.getGirisTarihi(),
                     r.getCikisTarihi(),
@@ -89,7 +213,7 @@ public class AdminReservationManagerPage extends JFrame {
         }
     }
 
-    // ✅ İPTAL / RED DURUMUNDA ODA NO HAVUZA GERİ GİDER
+    // ✅✅✅ ONAYLANDIĞINDA MAİL GÖNDEREN GÜNCEL METOT ✅✅✅
     private void durumDegistir(String durum, boolean odaIade) {
         Reservation r = getSecili();
         if (r == null) return;
@@ -99,146 +223,207 @@ public class AdminReservationManagerPage extends JFrame {
         }
 
         r.setDurum(durum);
+
+        // ✅ ONAYLANDIYSA MAIL GÖNDER
+        if ("Onaylandı".equals(durum)) {
+            String mesaj =
+                    "Sayın " + r.getMusteriAdi() + ",\n\n" +
+                            "Rezervasyonunuz ONAYLANMIŞTIR.\n\n" +
+                            "Oda Tipi: " + r.getOdaTipi() + "\n" +
+                            "Oda No: " + r.getOdaNo() + "\n" +
+                            "Giriş Tarihi: " + r.getGirisTarihi() + "\n" +
+                            "Çıkış Tarihi: " + r.getCikisTarihi() + "\n" +
+                            "Toplam Ücret: " + r.getFiyat() + " TL\n\n" +
+                            "İyi günler dileriz.\nOtel Yönetimi";
+
+            EmailService.sendMail(
+                    r.getMusteriEmail(),
+                    "Rezervasyonunuz Onaylandı",
+                    mesaj
+            );
+
+            JOptionPane.showMessageDialog(this,
+                    "Rezervasyon onaylandı ve müşteriye mail gönderildi.", "İşlem Başarılı", JOptionPane.INFORMATION_MESSAGE);
+        }
+
         ReservationManager.saveToFile();
         tabloyuDoldur();
     }
 
-    // ----------------------------------------------------
-    //   DETAY GÖSTER  (ODA NO DA DAHİL)
-    // ----------------------------------------------------
     private void detayGoster() {
         Reservation r = getSecili();
         if (r == null) return;
 
         JTextArea area = new JTextArea();
         area.setEditable(false);
-        area.setFont(new Font("Arial", Font.PLAIN, 14));
-
-        String detay =
-                "Müşteri: " + r.getMusteriAdi() +
-                "\nOda Tipi: " + r.getOdaTipi() +
-                "\nOda No: " + r.getOdaNo() +          // ✅ ODA NUMARASI
-                "\nKişi Sayısı: " + r.getKisiSayisi() +
-                "\nGiriş: " + r.getGirisTarihi() +
-                "\nÇıkış: " + r.getCikisTarihi() +
-                "\nFiyat: " + r.getFiyat() +
-                "\nDurum: " + r.getDurum() +
-                "\n\n--- KİŞİLER ---\n" +
-                r.getKisiler();
-
-        area.setText(detay);
+        area.setFont(new Font("Monospaced", Font.PLAIN, 14)); // Hizalama için monospaced
+        area.setText(
+                "Müşteri:    " + r.getMusteriAdi() +
+                "\nOda Tipi:   " + r.getOdaTipi() +
+                "\nOda No:     " + r.getOdaNo() +
+                "\nKişi Sayısı:" + r.getKisiSayisi() +
+                "\nGiriş:      " + r.getGirisTarihi() +
+                "\nÇıkış:      " + r.getCikisTarihi() +
+                "\nFiyat:      " + r.getFiyat() + " TL" +
+                "\nDurum:      " + r.getDurum() +
+                "\n\n--- KONAKLAYACAK KİŞİLER ---\n" +
+                r.getKisiler()
+        );
+        area.setBorder(new EmptyBorder(10,10,10,10));
 
         JScrollPane sp = new JScrollPane(area);
         sp.setPreferredSize(new Dimension(500, 400));
-
-        JOptionPane.showMessageDialog(this, sp, "Rezervasyon Detayı", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, sp, "Rezervasyon Detayı", JOptionPane.PLAIN_MESSAGE);
     }
 
-    // ----------------------------------------------------
-    //   YARDIMCI: kisiler String'ini listeye çevir
-    // ----------------------------------------------------
+    // 🔒 SANA AİT DOĞRULAMA METOTLARI AYNEN KORUNDU
+    private boolean kisiBilgiDogrula(String ad, String tc, String dogum) {
+        if (!ad.matches("[a-zA-ZçğıİöşüÇĞİÖŞÜ ]+")) {
+            JOptionPane.showMessageDialog(this, "Ad Soyad sadece harf olabilir!", "Hata", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        if (!tc.matches("\\d{11}") || (Character.getNumericValue(tc.charAt(10)) % 2 != 0)) {
+            JOptionPane.showMessageDialog(this, "TC 11 haneli ve son rakam çift olmalıdır!", "Hata", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        try {
+            LocalDate d = LocalDate.parse(dogum, STRICT_DATE);
+            if (d.isAfter(LocalDate.now())) {
+                JOptionPane.showMessageDialog(this, "Doğum tarihi gelecekte olamaz!", "Hata", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Doğum tarihi geçersiz! (Format: gg.aa.yyyy)", "Hata", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean tarihDogrula(String giris, String cikis) {
+        try {
+            LocalDate g = LocalDate.parse(giris, STRICT_DATE);
+            LocalDate c = LocalDate.parse(cikis, STRICT_DATE);
+
+            if (g.isBefore(LocalDate.now())) {
+                JOptionPane.showMessageDialog(this, "Giriş tarihi geçmiş olamaz!", "Hata", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+
+            if (c.isBefore(g)) {
+                JOptionPane.showMessageDialog(this, "Çıkış tarihi girişten önce olamaz!", "Hata", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Tarih formatı hatalı! (gg.aa.yyyy)", "Hata", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        return true;
+    }
+
     private List<String> parseKisiler(String kisilerStr) {
         List<String> list = new ArrayList<>();
         if (kisilerStr == null) return list;
-
         String[] satirlar = kisilerStr.split("\n");
         for (String s : satirlar) {
-            if (s != null && !s.trim().isEmpty()) {
-                list.add(s.trim());
-            }
+            if (!s.trim().isEmpty()) list.add(s.trim());
         }
         return list;
     }
 
-    // ----------------------------------------------------
-    //   REZERVASYON GÜNCELLE  (KİŞİ EKLE / SİL / TARİH)
-    // ----------------------------------------------------
     private void rezervasyonGuncelle() {
         Reservation r = getSecili();
         if (r == null) return;
 
         String[] secenekler = {"Kişi Ekle", "Kişi Sil", "Tarih Güncelle"};
-        int secim = JOptionPane.showOptionDialog(
-                this,
-                "Ne yapmak istiyorsun?",
+        int secim = JOptionPane.showOptionDialog(this, "Ne yapmak istiyorsun?",
                 "Rezervasyon Güncelle",
                 JOptionPane.DEFAULT_OPTION,
-                JOptionPane.INFORMATION_MESSAGE,
-                null,
-                secenekler,
-                secenekler[0]
-        );
-
-        if (secim == JOptionPane.CLOSED_OPTION) {
-            return;
-        }
+                JOptionPane.QUESTION_MESSAGE,
+                null, secenekler, secenekler[0]);
 
         List<String> kisiList = parseKisiler(r.getKisiler());
 
-        // ✅ KİŞİ EKLE
-        if (secim == 0) {
-            String ad    = JOptionPane.showInputDialog(this, "Ad Soyad:");
-            if (ad == null || ad.isEmpty()) return;
+        if (secim == 0) { // Kişi Ekle
 
-            String tc    = JOptionPane.showInputDialog(this, "TC:");
-            if (tc == null || tc.isEmpty()) return;
+            String ad = JOptionPane.showInputDialog(this, "Ad Soyad:");
+            if(ad == null) return; 
+            String tc = JOptionPane.showInputDialog(this, "TC:");
+            if(tc == null) return;
+            String dogum = JOptionPane.showInputDialog(this, "Doğum Tarihi (dd.MM.yyyy):");
+            if(dogum == null) return;
 
-            String dogum = JOptionPane.showInputDialog(this, "Doğum Tarihi:");
-            if (dogum == null || dogum.isEmpty()) return;
+            if (!kisiBilgiDogrula(ad, tc, dogum)) return;
 
-            String yeniKisi = "Ad Soyad: " + ad + " | TC: " + tc + " | Doğum: " + dogum;
-            kisiList.add(yeniKisi);
-            r.setKisiSayisi(r.getKisiSayisi() + 1);
-        }
-
-        // ✅ KİŞİ SİL
-        else if (secim == 1) {
-
-            if (kisiList.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Silinecek kişi yok.");
-                return;
-            }
-
-            String[] kisilerArray = kisiList.toArray(new String[0]);
-
-            String secilen = (String) JOptionPane.showInputDialog(
-                    this,
-                    "Silinecek kişiyi seç:",
-                    "Kişi Sil",
-                    JOptionPane.QUESTION_MESSAGE,
-                    null,
-                    kisilerArray,
-                    kisilerArray[0]
-            );
-
-            if (secilen == null) return;
-
-            kisiList.remove(secilen);
+            kisiList.add("Ad Soyad: " + ad + " | TC: " + tc + " | Doğum: " + dogum);
             r.setKisiSayisi(kisiList.size());
         }
 
-        // ✅ TARİH GÜNCELLE
-        else if (secim == 2) {
+        else if (secim == 1 && !kisiList.isEmpty()) { // Kişi Sil
+
+            String secilen = (String) JOptionPane.showInputDialog(
+                    this, "Silinecek kişiyi seç:",
+                    "Kişi Sil", JOptionPane.QUESTION_MESSAGE,
+                    null, kisiList.toArray(), kisiList.get(0)
+            );
+
+            if (secilen != null) {
+                kisiList.remove(secilen);
+                r.setKisiSayisi(kisiList.size());
+            }
+        }
+
+        else if (secim == 2) { // Tarih Güncelle
 
             String giris = JOptionPane.showInputDialog(this, "Yeni giriş tarihi:", r.getGirisTarihi());
-            if (giris == null || giris.isEmpty()) return;
-
+            if(giris == null) return;
             String cikis = JOptionPane.showInputDialog(this, "Yeni çıkış tarihi:", r.getCikisTarihi());
-            if (cikis == null || cikis.isEmpty()) return;
+            if(cikis == null) return;
+
+            if (!tarihDogrula(giris, cikis)) return;
 
             r.setGirisTarihi(giris);
             r.setCikisTarihi(cikis);
         }
 
         StringBuilder sb = new StringBuilder();
-        for (String satir : kisiList) {
-            sb.append(satir).append("\n");
-        }
+        for (String k : kisiList) sb.append(k).append("\n");
         r.setKisiler(sb.toString());
 
         ReservationManager.saveToFile();
         tabloyuDoldur();
 
-        JOptionPane.showMessageDialog(this, "Güncelleme kaydedildi.");
+        JOptionPane.showMessageDialog(this, "Güncelleme başarıyla kaydedildi.", "Başarılı", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    // --- MODERN BUTON TASARIMI ---
+    class ModernButton extends JButton {
+        private Color baseColor;
+        public ModernButton(String text, Color bg, Color fg) {
+            super(text);
+            this.baseColor = bg;
+            setFont(new Font("Segoe UI", Font.BOLD, 14));
+            setForeground(fg);
+            setContentAreaFilled(false);
+            setFocusPainted(false);
+            setBorderPainted(false);
+            setCursor(new Cursor(Cursor.HAND_CURSOR));
+            setAlignmentX(Component.CENTER_ALIGNMENT); // Panelde ortalamak için
+            setMaximumSize(new Dimension(240, 45)); // Sabit genişlik
+        }
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            if (getModel().isPressed()) g2.setColor(baseColor.darker());
+            else if (getModel().isRollover()) g2.setColor(baseColor.brighter());
+            else g2.setColor(baseColor);
+            g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 10, 10));
+            g2.dispose();
+            super.paintComponent(g);
+        }
     }
 }

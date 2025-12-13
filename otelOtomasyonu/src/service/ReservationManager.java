@@ -4,7 +4,17 @@ import java.io.*;
 import java.util.*;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+
+import javax.swing.JOptionPane;
+
 import model.Reservation;
+
+// ✅ PDF İÇİN iText
+import com.itextpdf.text.Document;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
 
 public class ReservationManager {
 
@@ -15,24 +25,22 @@ public class ReservationManager {
     private static TreeSet<Integer> deluxeOdalar   = new TreeSet<>();
     private static TreeSet<Integer> kralOdalar     = new TreeSet<>();
 
-    // TXT dosyası
     private static final String FILE_PATH = "reservations.txt";
 
     static {
-        // ✅ BAŞLANGIÇ ODA NUMARALARI (DOSYA YOKSA)
+        // Başlangıç oda aralıkları
         for (int i = 101; i <= 103; i++) standartOdalar.add(i);
         for (int i = 201; i <= 203; i++) deluxeOdalar.add(i);
         for (int i = 301; i <= 303; i++) kralOdalar.add(i);
 
-        loadFromFile(); // ✅ Dosya varsa bunları ezer
+        loadFromFile();
     }
 
-    // ---------------- REZERVASYON ----------------
+    // ===================== ✅ REZERVASYON =====================
 
     public static void addReservation(Reservation r) {
         int odaNo = odaAyirVeNumaraVer(r.getOdaTipi());
         r.setOdaNo(odaNo);
-
         rezervasyonlar.add(r);
         saveToFile();
     }
@@ -41,7 +49,7 @@ public class ReservationManager {
         return rezervasyonlar;
     }
 
-    // ---------------- ODA KONTROL ----------------
+    // ===================== ✅ ODA =====================
 
     public static boolean odaBosMu(String odaTipi) {
         if (odaTipi.contains("Standart")) return !standartOdalar.isEmpty();
@@ -50,15 +58,16 @@ public class ReservationManager {
         return false;
     }
 
-    // ✅ OTOMATİK ODA NUMARASI VER
     private static int odaAyirVeNumaraVer(String odaTipi) {
-        if (odaTipi.contains("Standart") && !standartOdalar.isEmpty()) return standartOdalar.pollFirst();
-        if (odaTipi.contains("Deluxe")   && !deluxeOdalar.isEmpty())   return deluxeOdalar.pollFirst();
-        if (odaTipi.contains("Kral")     && !kralOdalar.isEmpty())     return kralOdalar.pollFirst();
+        if (odaTipi.contains("Standart") && !standartOdalar.isEmpty())
+            return standartOdalar.pollFirst();
+        if (odaTipi.contains("Deluxe") && !deluxeOdalar.isEmpty())
+            return deluxeOdalar.pollFirst();
+        if (odaTipi.contains("Kral") && !kralOdalar.isEmpty())
+            return kralOdalar.pollFirst();
         return -1;
     }
 
-    // ✅ İPTALDE NUMARAYI GERİ KOY
     public static void odaIade(String odaTipi, int odaNo) {
         if (odaTipi.contains("Standart")) standartOdalar.add(odaNo);
         if (odaTipi.contains("Deluxe"))   deluxeOdalar.add(odaNo);
@@ -66,12 +75,11 @@ public class ReservationManager {
         saveToFile();
     }
 
-    // ✅ ADMIN GÖRÜNTÜLEME
     public static int getStandartKalan() { return standartOdalar.size(); }
     public static int getDeluxeKalan()   { return deluxeOdalar.size(); }
     public static int getKralKalan()     { return kralOdalar.size(); }
 
-    // ---------------- ✅ YENİ ODA EKLEME ----------------
+    // ===================== ✅ YENİ ODA EKLEME (BUTONLAR İÇİN) =====================
 
     public static void yeniStandartOdaEkle() {
         int yeniNo = standartOdalar.isEmpty() ? 101 : standartOdalar.last() + 1;
@@ -93,7 +101,6 @@ public class ReservationManager {
 
     // ===================== ✅ MÜŞTERİ ARAMA =====================
 
-    // ✅ İSME GÖRE ARAMA
     public static List<Reservation> searchByName(String nameQuery) {
         List<Reservation> result = new ArrayList<>();
         if (nameQuery == null || nameQuery.isEmpty()) return result;
@@ -102,90 +109,110 @@ public class ReservationManager {
 
         for (Reservation r : rezervasyonlar) {
             if (r.getMusteriAdi() != null &&
-                    r.getMusteriAdi().toLowerCase().contains(q)) {
+                r.getMusteriAdi().toLowerCase().contains(q)) {
                 result.add(r);
             }
         }
         return result;
     }
 
-    // ✅ TC'YE GÖRE ARAMA
-    public static List<Reservation> searchByTc(String tc) {
-        List<Reservation> result = new ArrayList<>();
-        if (tc == null || tc.isEmpty()) return result;
-
-        for (Reservation r : rezervasyonlar) {
-            String kisiler = r.getKisiler();
-            if (kisiler != null && kisiler.contains("TC: " + tc)) {
-                result.add(r);
-            }
-        }
-        return result;
-    }
-
-    // ===================== ✅ TARİH YARDIMCI =====================
+    // ===================== ✅ TARİH =====================
 
     private static LocalDate parseDate(String dateStr) {
-        if (dateStr == null) return null;
         try {
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-            return LocalDate.parse(dateStr, fmt);
+            return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("dd.MM.yyyy"));
         } catch (Exception e) {
             return null;
         }
     }
 
-    // ===================== ✅ HASILAT / GELİR =====================
+    // ===================== ✅ GELİR / HASILAT =====================
 
-    // ✅ SİSTEMDEKİ TÜM YILLARI BULUR
     public static Set<Integer> getReservationYears() {
         Set<Integer> years = new TreeSet<>();
         for (Reservation r : rezervasyonlar) {
             LocalDate d = parseDate(r.getGirisTarihi());
-            if (d != null) {
-                years.add(d.getYear());
-            }
+            if (d != null) years.add(d.getYear());
         }
         return years;
     }
 
-    // ✅ YILLIK HASILAT (SADECE ONAYLANANLAR)
     public static double getYearlyRevenue(int year) {
         double total = 0;
-
         for (Reservation r : rezervasyonlar) {
             if (!"Onaylandı".equals(r.getDurum())) continue;
-
             LocalDate d = parseDate(r.getGirisTarihi());
-            if (d == null) continue;
-
-            if (d.getYear() == year) {
+            if (d != null && d.getYear() == year) {
                 total += r.getFiyat();
             }
         }
         return total;
     }
 
-    // ✅ AYLIK HASILAT
-    // index 0 = Ocak, 11 = Aralık
     public static double[] getMonthlyRevenue(int year) {
         double[] monthly = new double[12];
-
         for (Reservation r : rezervasyonlar) {
             if (!"Onaylandı".equals(r.getDurum())) continue;
-
             LocalDate d = parseDate(r.getGirisTarihi());
-            if (d == null) continue;
-
-            if (d.getYear() == year) {
-                int monthIndex = d.getMonthValue() - 1;
-                monthly[monthIndex] += r.getFiyat();
+            if (d != null && d.getYear() == year) {
+                monthly[d.getMonthValue() - 1] += r.getFiyat();
             }
         }
         return monthly;
     }
 
-    // ---------------- DOSYAYA KAYDET ----------------
+    // ===================== ✅ PDF OLUŞTUR =====================
+
+    public static void exportRevenueToPDF(int year) {
+
+        try {
+            Document document = new Document();
+            PdfWriter.getInstance(document,
+                    new FileOutputStream("hasilat_" + year + ".pdf"));
+
+            document.open();
+
+            Font titleFont = new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD);
+            Font normalFont = new Font(Font.FontFamily.HELVETICA, 12);
+
+            document.add(new Paragraph("OTEL HASILAT RAPORU", titleFont));
+            document.add(new Paragraph("Yıl: " + year, normalFont));
+            document.add(new Paragraph("Tarih: " + LocalDate.now(), normalFont));
+            document.add(new Paragraph(" "));
+
+            PdfPTable table = new PdfPTable(2);
+            table.setWidthPercentage(100);
+            table.addCell("Ay");
+            table.addCell("Hasılat (TL)");
+
+            String[] aylar = {
+                    "Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
+                    "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"
+            };
+
+            double[] monthly = getMonthlyRevenue(year);
+            double yearlyTotal = getYearlyRevenue(year);
+
+            for (int i = 0; i < 12; i++) {
+                table.addCell(aylar[i]);
+                table.addCell(String.valueOf(monthly[i]));
+            }
+
+            document.add(table);
+            document.add(new Paragraph("\nYILLIK TOPLAM: " + yearlyTotal + " TL", titleFont));
+            document.close();
+
+            JOptionPane.showMessageDialog(null,
+                    "PDF başarıyla oluşturuldu:\n" +
+                            "hasilat_" + year + ".pdf");
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null,
+                    "PDF oluşturulurken hata:\n" + e.getMessage());
+        }
+    }
+
+    // ===================== ✅ DOSYA =====================
 
     public static void saveToFile() {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(FILE_PATH))) {
@@ -202,6 +229,7 @@ public class ReservationManager {
 
                 writer.write(
                         r.getMusteriAdi() + "##" +
+                        r.getMusteriEmail() + "##" +       // ✅ EMAIL
                         r.getOdaTipi() + "##" +
                         r.getOdaNo() + "##" +
                         r.getKisiSayisi() + "##" +
@@ -218,8 +246,6 @@ public class ReservationManager {
             System.out.println("Kayıt hatası: " + e.getMessage());
         }
     }
-
-    // ---------------- DOSYADAN OKU ----------------
 
     public static void loadFromFile() {
         try {
@@ -238,24 +264,25 @@ public class ReservationManager {
             while ((line = reader.readLine()) != null) {
 
                 String[] parts = line.split("##");
-                if (parts.length < 9) continue;
+                if (parts.length < 10) continue;
 
-                String kisiler = parts[8]
+                String kisiler = parts[9]
                         .replace("<<<>>>", "\n")
                         .replace("[PIPE]", "|");
 
                 Reservation r = new Reservation(
-                        parts[0],                       // musteri
-                        parts[1],                       // oda tipi
-                        Integer.parseInt(parts[3]),     // kişi sayısı
-                        kisiler,
-                        parts[4],                       // giriş
-                        parts[5],                       // çıkış
-                        Double.parseDouble(parts[6])    // fiyat
+                        parts[0],                    // musteriAdi
+                        parts[1],                    // musteriEmail
+                        parts[2],                    // odaTipi
+                        Integer.parseInt(parts[4]),  // kisiSayisi
+                        kisiler,                     // kisiler
+                        parts[5],                    // giris
+                        parts[6],                    // cikis
+                        Double.parseDouble(parts[7]) // fiyat
                 );
 
-                r.setOdaNo(Integer.parseInt(parts[2]));
-                r.setDurum(parts[7]);
+                r.setOdaNo(Integer.parseInt(parts[3]));
+                r.setDurum(parts[8]);
 
                 rezervasyonlar.add(r);
             }
@@ -267,7 +294,6 @@ public class ReservationManager {
         }
     }
 
-    // ✅ "[101, 102, 103]" → TreeSet
     private static TreeSet<Integer> parseSet(String line) {
         TreeSet<Integer> set = new TreeSet<>();
         if (line == null || line.length() < 2) return set;

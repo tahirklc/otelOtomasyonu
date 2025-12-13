@@ -3,8 +3,9 @@ package model;
 public class Reservation {
 
     private String musteriAdi;
+    private String musteriEmail;   // ✅ Mail bildirimi için
     private String odaTipi;
-    private int odaNo;              // ✅ YENİ: Oda numarası (101, 201, 301...)
+    private int odaNo;
     private int kisiSayisi;
     private String kisiler;
     private String girisTarihi;
@@ -12,12 +13,18 @@ public class Reservation {
     private double fiyat;
     private String durum;
 
-    // ✅ GÜNCELLENMİŞ CONSTRUCTOR (odaNo SONRADAN set edilecek)
-    public Reservation(String musteriAdi, String odaTipi, int kisiSayisi,
-                       String kisiler, String girisTarihi, String cikisTarihi,
+    // ✅ TAM GÜNCEL CONSTRUCTOR (EMAIL DAHİL)
+    public Reservation(String musteriAdi,
+                       String musteriEmail,
+                       String odaTipi,
+                       int kisiSayisi,
+                       String kisiler,
+                       String girisTarihi,
+                       String cikisTarihi,
                        double fiyat) {
 
         this.musteriAdi = musteriAdi;
+        this.musteriEmail = musteriEmail;
         this.odaTipi = odaTipi;
         this.kisiSayisi = kisiSayisi;
         this.kisiler = kisiler;
@@ -25,13 +32,14 @@ public class Reservation {
         this.cikisTarihi = cikisTarihi;
         this.fiyat = fiyat;
         this.durum = "Bekliyor";
-        this.odaNo = -1; // ✅ Henüz atanmadı (ReservationManager atayacak)
+        this.odaNo = -1; // ✅ ReservationManager atayacak
     }
 
     // -------- GETTERLAR --------
     public String getMusteriAdi() { return musteriAdi; }
+    public String getMusteriEmail() { return musteriEmail; }
     public String getOdaTipi() { return odaTipi; }
-    public int getOdaNo() { return odaNo; }                 // ✅ YENİ
+    public int getOdaNo() { return odaNo; }
     public int getKisiSayisi() { return kisiSayisi; }
     public String getKisiler() { return kisiler; }
     public String getGirisTarihi() { return girisTarihi; }
@@ -40,33 +48,12 @@ public class Reservation {
     public String getDurum() { return durum; }
 
     // -------- SETTERLAR --------
-    public void setDurum(String durum) {
-        this.durum = durum;
-    }
-
-    public void setKisiSayisi(int kisiSayisi) {
-        this.kisiSayisi = kisiSayisi;
-    }
-
-    public void setGirisTarihi(String girisTarihi) {
-        this.girisTarihi = girisTarihi;
-    }
-
-    public void setCikisTarihi(String cikisTarihi) {
-        this.cikisTarihi = cikisTarihi;
-    }
-
-    public void setFiyat(double fiyat) {
-        this.fiyat = fiyat;
-    }
-
-    // ✅ SORUNU ÇÖZEN METOT (KİŞİ GÜNCELLEME)
-    public void setKisiler(String kisiler) {
-        this.kisiler = kisiler;
-    }
-
-    // ✅ YENİ: ODA NUMARASI SETTER
-    public void setOdaNo(int odaNo) {
-        this.odaNo = odaNo;
-    }
+    public void setDurum(String durum) { this.durum = durum; }
+    public void setKisiSayisi(int kisiSayisi) { this.kisiSayisi = kisiSayisi; }
+    public void setGirisTarihi(String girisTarihi) { this.girisTarihi = girisTarihi; }
+    public void setCikisTarihi(String cikisTarihi) { this.cikisTarihi = cikisTarihi; }
+    public void setFiyat(double fiyat) { this.fiyat = fiyat; }
+    public void setKisiler(String kisiler) { this.kisiler = kisiler; }
+    public void setOdaNo(int odaNo) { this.odaNo = odaNo; }
+    public void setMusteriEmail(String musteriEmail) { this.musteriEmail = musteriEmail; }
 }
