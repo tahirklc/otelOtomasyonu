@@ -1,3 +1,5 @@
 tahir|tahirxx63@gmail.com|1234|user
-admin|admin@otel.com|admin|admin
+admin|admin@otel.com|1234|admin
 kullanici|test@otel.com|1111|user
+oguz|oguzdilmac@gmail.com|1234|user
+fatma|fatma12@gmail.com|1234|user

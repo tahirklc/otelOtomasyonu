@@ -65,7 +65,7 @@ public class AdminMenu extends JFrame {
         // KART 1: Rezervasyon
         JPanel pnlRezervasyon = createDashboardCard(
                 "Rezervasyonlar", 
-                "src/resources/calendar.jpg", 
+                "src/resources/rezervation.png", 
                 "Rezervasyon kayıtlarını incele.",
                 e -> new AdminReservationManagerPage().setVisible(true)
         );
@@ -74,7 +74,7 @@ public class AdminMenu extends JFrame {
         // KART 2: Oda
         JPanel pnlOda = createDashboardCard(
                 "Oda Yönetimi", 
-                "src/resources/bed.jpg", 
+                "src/resources/room.png", 
                 "Oda durumlarını düzenle.",
                 e -> new AdminRoomManagerPage().setVisible(true)
         );

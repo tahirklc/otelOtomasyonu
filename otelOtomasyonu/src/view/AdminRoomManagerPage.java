@@ -23,6 +23,9 @@ public class AdminRoomManagerPage extends JFrame {
     private final Color BG_COLOR = new Color(245, 247, 250);
     private final Color PRIMARY_COLOR = new Color(63, 81, 181);
 
+    // --- ODA LİMİTİ ---
+    private final int MAX_ROOM_LIMIT = 5;
+
     public AdminRoomManagerPage() {
         setTitle("Yönetici - Oda Kapasite Yönetimi");
         setSize(1000, 650);
@@ -45,7 +48,7 @@ public class AdminRoomManagerPage extends JFrame {
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 26));
         lblTitle.setForeground(new Color(50, 50, 50));
         
-        JLabel lblSub = new JLabel("Doluluk oranlarını inceleyin ve yeni oda ekleyin.");
+        JLabel lblSub = new JLabel("Doluluk oranlarını inceleyin. (Her kategori için maks. " + MAX_ROOM_LIMIT + " oda)");
         lblSub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         lblSub.setForeground(Color.GRAY);
 
@@ -54,32 +57,39 @@ public class AdminRoomManagerPage extends JFrame {
         mainContainer.add(headerPanel);
 
         // 2. Oda Kartlarının Oluşturulması
-        // Standart
+        
+        // --- STANDART ODA ---
         cardStandart = new RoomCard("Standart Oda", new Color(0, 150, 136)); // Teal Rengi
         cardStandart.setAddAction(e -> {
-            ReservationManager.yeniStandartOdaEkle();
-            guncelle();
-            showSuccessMsg("Standart");
+            if (checkLimit("Standart")) {
+                ReservationManager.yeniStandartOdaEkle();
+                guncelle();
+                showSuccessMsg("Standart");
+            }
         });
         mainContainer.add(cardStandart);
         mainContainer.add(Box.createVerticalStrut(20)); // Boşluk
 
-        // Deluxe
+        // --- DELUXE ODA ---
         cardDeluxe = new RoomCard("Deluxe Oda", new Color(255, 152, 0)); // Turuncu
         cardDeluxe.setAddAction(e -> {
-            ReservationManager.yeniDeluxeOdaEkle();
-            guncelle();
-            showSuccessMsg("Deluxe");
+            if (checkLimit("Deluxe")) {
+                ReservationManager.yeniDeluxeOdaEkle();
+                guncelle();
+                showSuccessMsg("Deluxe");
+            }
         });
         mainContainer.add(cardDeluxe);
         mainContainer.add(Box.createVerticalStrut(20));
 
-        // Kral
+        // --- KRAL DAİRESİ ---
         cardKral = new RoomCard("Kral Dairesi", new Color(156, 39, 176)); // Mor
         cardKral.setAddAction(e -> {
-            ReservationManager.yeniKralOdaEkle();
-            guncelle();
-            showSuccessMsg("Kral");
+            if (checkLimit("Kral")) {
+                ReservationManager.yeniKralOdaEkle();
+                guncelle();
+                showSuccessMsg("Kral");
+            }
         });
         mainContainer.add(cardKral);
 
@@ -97,7 +107,42 @@ public class AdminRoomManagerPage extends JFrame {
         JOptionPane.showMessageDialog(this, "Yeni " + tur + " oda sisteme eklendi!", "İşlem Başarılı", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // ✅ BOŞ & DOLU ODALARI DOĞRU ŞEKİLDE GÖSTERİR (MANTIK KORUNDU)
+    // 
+    // ✅ ODA LİMİT KONTROLÜ (YENİ EKLENDİ)
+    private boolean checkLimit(String odaTipi) {
+        int mevcutSayi = getMevcutOdaSayisi(odaTipi);
+        
+        if (mevcutSayi >= MAX_ROOM_LIMIT) {
+            JOptionPane.showMessageDialog(this, 
+                "Bu kategoride maksimum " + MAX_ROOM_LIMIT + " oda sınırına ulaşıldı!\nDaha fazla ekleyemezsiniz.", 
+                "Kapasite Dolu", 
+                JOptionPane.WARNING_MESSAGE);
+            return false; // Ekleme yapma
+        }
+        return true; // Ekleme yapabilirsin
+    }
+
+    // ✅ YARDIMCI METOT: TOPLAM ODA SAYISINI HESAPLAR
+    private int getMevcutOdaSayisi(String tip) {
+        // 1. Boş Oda Sayısı
+        int bos = 0;
+        if (tip.equals("Standart")) bos = ReservationManager.getStandartKalan();
+        else if (tip.equals("Deluxe")) bos = ReservationManager.getDeluxeKalan();
+        else if (tip.equals("Kral")) bos = ReservationManager.getKralKalan();
+
+        // 2. Dolu Oda Sayısı (Rezervasyonlardan sayılır)
+        int dolu = 0;
+        for (Reservation r : ReservationManager.getReservations()) {
+            if (r != null && (r.getDurum().equals("Bekliyor") || r.getDurum().equals("Onaylandı"))) {
+                if (r.getOdaTipi().contains(tip)) {
+                    dolu++;
+                }
+            }
+        }
+        return bos + dolu;
+    }
+
+    // ✅ BOŞ & DOLU ODALARI DOĞRU ŞEKİLDE GÖSTERİR
     private void guncelle() {
 
         // 1. Verileri Çek
@@ -118,7 +163,7 @@ public class AdminRoomManagerPage extends JFrame {
             }
         }
 
-        // 2. Toplam Oda Sayılarını Hesapla (Boş + Dolu)
+        // 2. Toplam Oda Sayıları
         int topStandart = bosStandart + doluStandart.size();
         int topDeluxe   = bosDeluxe + doluDeluxe.size();
         int topKral     = bosKral + doluKral.size();
@@ -175,7 +220,7 @@ public class AdminRoomManagerPage extends JFrame {
             centerPanel.setBackground(Color.WHITE);
 
             // Doluluk Barı
-            progressBar = new JProgressBar(0, 100);
+            progressBar = new JProgressBar(0, MAX_ROOM_LIMIT); // Max değer limit olarak ayarlandı
             progressBar.setStringPainted(true);
             progressBar.setFont(new Font("Segoe UI", Font.BOLD, 12));
             progressBar.setForeground(themeColor);
@@ -213,24 +258,23 @@ public class AdminRoomManagerPage extends JFrame {
             int occupiedCount = occupiedList.size();
             
             // İstatistik Yazısı
-            lblStats.setText("<html>Boş: <font color='green'>" + empty + "</font> | Dolu: <font color='red'>" + occupiedCount + "</font></html>");
+            lblStats.setText("<html>Boş: <font color='green'>" + empty + "</font> | Toplam: " + total + "/" + MAX_ROOM_LIMIT + "</html>");
 
-            // Progress Bar (Doluluk Oranı)
-            if (total > 0) {
-                int percentage = (int) (((double) occupiedCount / total) * 100);
-                progressBar.setValue(percentage);
-                progressBar.setString("Doluluk: %" + percentage + " (" + occupiedCount + "/" + total + ")");
-            } else {
-                progressBar.setValue(0);
-                progressBar.setString("Oda Yok");
-            }
+            // Progress Bar (Doluluk Oranı yerine Kapasite Kullanımı)
+            // Burada bar'ın doluluğu toplam oda sayısını gösterir
+            progressBar.setValue(total); 
+            progressBar.setString("Kapasite Kullanımı: " + total + " / " + MAX_ROOM_LIMIT);
+
+            // Oda ekleme butonu kontrolü (5'e ulaştıysa pasif yap veya uyarı ver)
+            // İsteğe bağlı: Butonu pasif yapmak istersen aşağıdaki satırı aç
+            // btnAdd.setEnabled(total < MAX_ROOM_LIMIT);
 
             // Dolu Oda Listesi
             if (occupiedList.isEmpty()) {
                 areaOccupied.setText("- Şu an tüm odalar boş -");
                 areaOccupied.setForeground(Color.GRAY);
             } else {
-                areaOccupied.setText(occupiedList.toString()); // [101, 102] formatında yazar
+                areaOccupied.setText(occupiedList.toString()); 
                 areaOccupied.setForeground(new Color(60, 60, 60));
             }
         }

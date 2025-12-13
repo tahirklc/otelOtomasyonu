@@ -2,9 +2,9 @@ package view;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.text.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
 import model.Kullanici;
 import service.KullaniciDosyaIslemleri;
@@ -22,18 +22,18 @@ public class LoginMenu extends JFrame {
 
     public LoginMenu() {
         setTitle("Otel Rezervasyon Sistemi");
-        setSize(900, 600); // Biraz daha geniş modern oran
+        setSize(900, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         
-        // Ana Layout: Arka plan resmi üzerine merkezlenmiş panel
+        // Ana Layout
         setContentPane(new BackgroundPanel("src/resources/background.png"));
-        setLayout(new GridBagLayout()); // Paneli tam ortaya sabitlemek için
+        setLayout(new GridBagLayout()); 
 
-        // Giriş Kartı (Login Card)
+        // Giriş Kartı
         JPanel loginCard = new RoundedPanel(25, new Color(255, 255, 255, 245));
         loginCard.setLayout(null);
-        loginCard.setPreferredSize(new Dimension(380, 450)); // Kart boyutu
+        loginCard.setPreferredSize(new Dimension(380, 450));
         
         // --- BİLEŞENLER ---
 
@@ -59,6 +59,8 @@ public class LoginMenu extends JFrame {
 
         txtKullaniciAdi = createModernTextField();
         txtKullaniciAdi.setBounds(40, 135, 300, 40);
+        // KARAKTER SINIRI EKLEME (30 Karakter)
+        addCharacterLimit(txtKullaniciAdi, 30, "Kullanıcı Adı");
         loginCard.add(txtKullaniciAdi);
 
         // 3. Şifre
@@ -70,15 +72,17 @@ public class LoginMenu extends JFrame {
 
         txtSifre = createModernPasswordField();
         txtSifre.setBounds(40, 215, 300, 40);
+        // KARAKTER SINIRI EKLEME (30 Karakter)
+        addCharacterLimit(txtSifre, 30, "Şifre");
         loginCard.add(txtSifre);
 
-        // 4. Giriş Butonu (Custom)
+        // 4. Giriş Butonu
         JButton btnGiris = createModernButton("Giriş Yap", PRIMARY_COLOR, Color.WHITE);
         btnGiris.setBounds(40, 280, 300, 45);
         btnGiris.addActionListener(e -> normalGiris());
         loginCard.add(btnGiris);
 
-        // 5. Ayırıcı (Veya)
+        // 5. Ayırıcı
         JLabel lblOr = new JLabel("- veya -", SwingConstants.CENTER);
         lblOr.setForeground(Color.GRAY);
         lblOr.setFont(new Font("Segoe UI", Font.PLAIN, 12));
@@ -88,18 +92,50 @@ public class LoginMenu extends JFrame {
         // 6. Google Butonu
         JButton btnGoogle = createModernButton("Google ile Devam Et", Color.WHITE, Color.DARK_GRAY);
         btnGoogle.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220)));
-        // Google ikonu varsa ekle, yoksa boş kalır
         try {
             ImageIcon gIcon = new ImageIcon(new ImageIcon("src/resources/google.png").getImage().getScaledInstance(20, 20, Image.SCALE_SMOOTH));
             btnGoogle.setIcon(gIcon);
-        } catch (Exception ex) { /* İkon yoksa hata verme */ }
+        } catch (Exception ex) { }
         
         btnGoogle.setBounds(40, 365, 300, 45);
         btnGoogle.addActionListener(e -> googleGiris());
         loginCard.add(btnGoogle);
 
-        // Karta ekle
         add(loginCard);
+    }
+
+    // --- ÖNEMLİ: KARAKTER SINIRI VE CANLI ENGELLEME MANTIĞI ---
+    
+    private void addCharacterLimit(JTextField textField, int limit, String fieldName) {
+        AbstractDocument doc = (AbstractDocument) textField.getDocument();
+        doc.setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
+                String string = fb.getDocument().getText(0, fb.getDocument().getLength()) + text;
+                
+                // Silme işlemi (Backspace) her zaman serbest olmalı
+                if (text.length() == 0) {
+                     super.replace(fb, offset, length, text, attrs);
+                     return;
+                }
+
+                if ((fb.getDocument().getLength() + text.length() - length) <= limit) {
+                    super.replace(fb, offset, length, text, attrs);
+                } else {
+                    // Sınır aşıldı! Yazmayı engelle ve uyarı ver.
+                    showErrorDialog(fieldName + " en fazla " + limit + " karakter olabilir!");
+                }
+            }
+            
+            @Override
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+                 if ((fb.getDocument().getLength() + string.length()) <= limit) {
+                    super.insertString(fb, offset, string, attr);
+                } else {
+                    showErrorDialog(fieldName + " en fazla " + limit + " karakter olabilir!");
+                }
+            }
+        });
     }
 
     // --- YARDIMCI UI METODLARI ---
@@ -119,11 +155,10 @@ public class LoginMenu extends JFrame {
     private void styleField(JTextField field) {
         field.setFont(MAIN_FONT);
         field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(200, 200, 200)), // Sadece alt çizgi
+                BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(200, 200, 200)),
                 new EmptyBorder(5, 5, 5, 5)));
         field.setBackground(new Color(250, 250, 250));
         
-        // Focus olduğunda alt çizgi rengini değiştir
         field.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusGained(java.awt.event.FocusEvent evt) {
                 field.setBorder(BorderFactory.createCompoundBorder(
@@ -167,16 +202,158 @@ public class LoginMenu extends JFrame {
         return btn;
     }
 
-    // --- ÖZEL PANELLER (Background & Rounded) ---
+    // --- MODERN POPUP'LAR ---
 
-    // Arka plan resmini otomatik scale eden panel
+    private void showWelcomeDialog(String kullaniciAdi) {
+        JDialog dialog = createBaseDialog(180);
+        JPanel panel = createBasePanel(Color.WHITE);
+
+        JLabel lblIcon = new JLabel("✔", SwingConstants.CENTER);
+        lblIcon.setFont(new Font("Segoe UI", Font.BOLD, 40));
+        lblIcon.setForeground(new Color(76, 175, 80)); 
+        lblIcon.setBounds(0, 15, 350, 50);
+        panel.add(lblIcon);
+
+        JLabel lblMsg = new JLabel("Giriş Başarılı!", SwingConstants.CENTER);
+        lblMsg.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblMsg.setForeground(new Color(50,50,50));
+        lblMsg.setBounds(0, 65, 350, 25);
+        panel.add(lblMsg);
+
+        JLabel lblName = new JLabel("Hoş geldiniz, " + kullaniciAdi, SwingConstants.CENTER);
+        lblName.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblName.setForeground(Color.GRAY);
+        lblName.setBounds(0, 90, 350, 20);
+        panel.add(lblName);
+
+        JButton btnOk = createModernButton("Devam Et", PRIMARY_COLOR, Color.WHITE);
+        btnOk.setBounds(100, 130, 150, 35);
+        btnOk.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btnOk.addActionListener(e -> dialog.dispose());
+        panel.add(btnOk);
+
+        dialog.add(panel);
+        dialog.setVisible(true);
+    }
+
+    private void showErrorDialog(String hataMesaji) {
+        // Eğer zaten bir hata penceresi açıksa tekrar açma (Spam engelleme)
+        Window[] windows = Window.getWindows();
+        for (Window w : windows) {
+            if (w instanceof JDialog && w.isVisible() && "Hata".equals(((JDialog)w).getTitle())) {
+                return; 
+            }
+        }
+
+        JDialog dialog = createBaseDialog(190);
+        dialog.setTitle("Hata"); // Kontrol için başlık set ediyoruz (görünmese bile)
+        JPanel panel = createBasePanel(Color.WHITE);
+
+        JLabel lblIcon = new JLabel("!", SwingConstants.CENTER);
+        lblIcon.setFont(new Font("Segoe UI", Font.BOLD, 40));
+        lblIcon.setForeground(ACCENT_COLOR);
+        lblIcon.setBounds(0, 15, 350, 50);
+        panel.add(lblIcon);
+
+        JLabel lblTitle = new JLabel("Uyarı!", SwingConstants.CENTER);
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblTitle.setForeground(new Color(50,50,50));
+        lblTitle.setBounds(0, 65, 350, 25);
+        panel.add(lblTitle);
+
+        JLabel lblMsg = new JLabel("<html><center>" + hataMesaji + "</center></html>", SwingConstants.CENTER);
+        lblMsg.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        lblMsg.setForeground(Color.GRAY);
+        lblMsg.setBounds(20, 90, 310, 40);
+        panel.add(lblMsg);
+
+        JButton btnOk = createModernButton("Tamam", ACCENT_COLOR, Color.WHITE);
+        btnOk.setBounds(100, 135, 150, 35);
+        btnOk.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btnOk.addActionListener(e -> dialog.dispose());
+        panel.add(btnOk);
+
+        dialog.add(panel);
+        dialog.setVisible(true);
+    }
+    
+    // Google Girişi için Modern ve Limitli Input Dialog
+    private String showModernInputDialog(String message, int limit) {
+        JDialog dialog = new JDialog(this, true);
+        dialog.setUndecorated(true);
+        dialog.setSize(400, 220);
+        dialog.setLocationRelativeTo(this);
+        dialog.setBackground(new Color(0,0,0,0));
+        
+        JPanel panel = createBasePanel(Color.WHITE);
+        panel.setSize(400, 220);
+        
+        JLabel lblMsg = new JLabel(message, SwingConstants.CENTER);
+        lblMsg.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblMsg.setForeground(new Color(50,50,50));
+        lblMsg.setBounds(0, 20, 400, 30);
+        panel.add(lblMsg);
+        
+        JTextField txtInput = createModernTextField();
+        txtInput.setBounds(50, 70, 300, 40);
+        addCharacterLimit(txtInput, limit, "E-posta"); // Buraya da limit ekliyoruz
+        panel.add(txtInput);
+        
+        final String[] result = {null};
+        
+        JButton btnOk = createModernButton("Tamam", PRIMARY_COLOR, Color.WHITE);
+        btnOk.setBounds(50, 140, 140, 40);
+        btnOk.addActionListener(e -> {
+            result[0] = txtInput.getText();
+            dialog.dispose();
+        });
+        panel.add(btnOk);
+        
+        JButton btnCancel = createModernButton("İptal", Color.LIGHT_GRAY, Color.WHITE);
+        btnCancel.setBounds(210, 140, 140, 40);
+        btnCancel.addActionListener(e -> dialog.dispose());
+        panel.add(btnCancel);
+        
+        dialog.add(panel);
+        dialog.setVisible(true);
+        
+        return result[0];
+    }
+
+    private JDialog createBaseDialog(int height) {
+        JDialog dialog = new JDialog(this, true);
+        dialog.setUndecorated(true);
+        dialog.setSize(350, height);
+        dialog.setLocationRelativeTo(this);
+        dialog.setBackground(new Color(0,0,0,0));
+        return dialog;
+    }
+
+    private JPanel createBasePanel(Color color) {
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+                g2.setColor(new Color(230, 230, 230));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 20, 20);
+            }
+        };
+        panel.setLayout(null);
+        return panel;
+    }
+
+    // --- ÖZEL PANELLER ---
+
     class BackgroundPanel extends JPanel {
         private Image img;
         public BackgroundPanel(String path) {
             try {
                 img = new ImageIcon(path).getImage();
             } catch (Exception e) {
-                setBackground(new Color(40, 40, 60)); // Resim yoksa koyu bir renk
+                setBackground(new Color(40, 40, 60));
             }
         }
         @Override
@@ -188,7 +365,6 @@ public class LoginMenu extends JFrame {
         }
     }
 
-    // Yuvarlak köşeli ve yarı saydam panel
     class RoundedPanel extends JPanel {
         private int radius;
         private Color bgColor;
@@ -196,7 +372,7 @@ public class LoginMenu extends JFrame {
         public RoundedPanel(int radius, Color bgColor) {
             this.radius = radius;
             this.bgColor = bgColor;
-            setOpaque(false); // Default boyamayı kapat
+            setOpaque(false);
         }
 
         @Override
@@ -209,8 +385,7 @@ public class LoginMenu extends JFrame {
         }
     }
 
-    // --- MANTIK KISMI (AYNEN KORUNDU) ---
-    // -----------------------------------------------------
+    // --- MANTIK KISMI ---
 
     private void normalGiris() {
         String kadi = txtKullaniciAdi.getText();
@@ -219,12 +394,11 @@ public class LoginMenu extends JFrame {
         Kullanici giren = KullaniciDosyaIslemleri.login(kadi, sifre);
 
         if (giren == null) {
-            JOptionPane.showMessageDialog(this, "Hatalı kullanıcı adı veya şifre!", "Giriş Hatası", JOptionPane.ERROR_MESSAGE);
+            showErrorDialog("Hatalı kullanıcı adı veya şifre!");
             return;
         }
 
-        // Başarılı mesajını biraz daha modern yapalım (Opsiyonel)
-        JOptionPane.showMessageDialog(this, "Hoş geldiniz, " + giren.getKullaniciAdi());
+        showWelcomeDialog(giren.getKullaniciAdi());
 
         if (giren.getRol().equals("admin")) {
             new AdminMenu(giren.getKullaniciAdi()).setVisible(true);
@@ -235,13 +409,15 @@ public class LoginMenu extends JFrame {
     }
 
     private void googleGiris() {
-        String mail = JOptionPane.showInputDialog(this, "Google E-postanızı girin:");
+        // Eski JOptionPane yerine yeni metodumuz (Limitli: 40)
+        String mail = showModernInputDialog("Google E-postanızı girin:", 40);
 
         if (mail == null || mail.isEmpty()) return;
 
         for (Kullanici k : KullaniciDosyaIslemleri.getKullanicilar()) {
             if (k.getEmail().equals(mail)) {
-                JOptionPane.showMessageDialog(this, "Google girişi başarılı!");
+                showWelcomeDialog(k.getKullaniciAdi());
+                
                 if (k.getRol().equals("admin")) {
                     new AdminMenu(k.getKullaniciAdi()).setVisible(true);
                 } else {
@@ -251,11 +427,10 @@ public class LoginMenu extends JFrame {
                 return;
             }
         }
-        JOptionPane.showMessageDialog(this, "Bu mail sisteme kayıtlı değil!", "Hata", JOptionPane.WARNING_MESSAGE);
+        showErrorDialog("Bu mail sisteme kayıtlı değil!");
     }
 
     public static void main(String[] args) {
-        // UI Thread güvenliği için
         SwingUtilities.invokeLater(() -> new LoginMenu().setVisible(true));
     }
 }

@@ -186,7 +186,7 @@ public class AdminReservationManagerPage extends JFrame {
         panel.add(Box.createVerticalStrut(5));
     }
 
-    // --- MANTIK METOTLARI (AYNEN KORUNDU) ---
+    // --- MANTIK METOTLARI ---
 
     private Reservation getSecili() {
         int row = table.getSelectedRow();
@@ -213,7 +213,6 @@ public class AdminReservationManagerPage extends JFrame {
         }
     }
 
-    // ✅✅✅ ONAYLANDIĞINDA MAİL GÖNDEREN GÜNCEL METOT ✅✅✅
     private void durumDegistir(String durum, boolean odaIade) {
         Reservation r = getSecili();
         if (r == null) return;
@@ -224,7 +223,6 @@ public class AdminReservationManagerPage extends JFrame {
 
         r.setDurum(durum);
 
-        // ✅ ONAYLANDIYSA MAIL GÖNDER
         if ("Onaylandı".equals(durum)) {
             String mesaj =
                     "Sayın " + r.getMusteriAdi() + ",\n\n" +
@@ -260,12 +258,12 @@ public class AdminReservationManagerPage extends JFrame {
         area.setText(
                 "Müşteri:    " + r.getMusteriAdi() +
                 "\nOda Tipi:   " + r.getOdaTipi() +
-                "\nOda No:     " + r.getOdaNo() +
+                "\nOda No:      " + r.getOdaNo() +
                 "\nKişi Sayısı:" + r.getKisiSayisi() +
-                "\nGiriş:      " + r.getGirisTarihi() +
-                "\nÇıkış:      " + r.getCikisTarihi() +
-                "\nFiyat:      " + r.getFiyat() + " TL" +
-                "\nDurum:      " + r.getDurum() +
+                "\nGiriş:       " + r.getGirisTarihi() +
+                "\nÇıkış:       " + r.getCikisTarihi() +
+                "\nFiyat:       " + r.getFiyat() + " TL" +
+                "\nDurum:       " + r.getDurum() +
                 "\n\n--- KONAKLAYACAK KİŞİLER ---\n" +
                 r.getKisiler()
         );
@@ -274,32 +272,6 @@ public class AdminReservationManagerPage extends JFrame {
         JScrollPane sp = new JScrollPane(area);
         sp.setPreferredSize(new Dimension(500, 400));
         JOptionPane.showMessageDialog(this, sp, "Rezervasyon Detayı", JOptionPane.PLAIN_MESSAGE);
-    }
-
-    // 🔒 SANA AİT DOĞRULAMA METOTLARI AYNEN KORUNDU
-    private boolean kisiBilgiDogrula(String ad, String tc, String dogum) {
-        if (!ad.matches("[a-zA-ZçğıİöşüÇĞİÖŞÜ ]+")) {
-            JOptionPane.showMessageDialog(this, "Ad Soyad sadece harf olabilir!", "Hata", JOptionPane.ERROR_MESSAGE);
-            return false;
-        }
-
-        if (!tc.matches("\\d{11}") || (Character.getNumericValue(tc.charAt(10)) % 2 != 0)) {
-            JOptionPane.showMessageDialog(this, "TC 11 haneli ve son rakam çift olmalıdır!", "Hata", JOptionPane.ERROR_MESSAGE);
-            return false;
-        }
-
-        try {
-            LocalDate d = LocalDate.parse(dogum, STRICT_DATE);
-            if (d.isAfter(LocalDate.now())) {
-                JOptionPane.showMessageDialog(this, "Doğum tarihi gelecekte olamaz!", "Hata", JOptionPane.ERROR_MESSAGE);
-                return false;
-            }
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Doğum tarihi geçersiz! (Format: gg.aa.yyyy)", "Hata", JOptionPane.ERROR_MESSAGE);
-            return false;
-        }
-
-        return true;
     }
 
     private boolean tarihDogrula(String giris, String cikis) {
@@ -334,6 +306,7 @@ public class AdminReservationManagerPage extends JFrame {
         return list;
     }
 
+    // 
     private void rezervasyonGuncelle() {
         Reservation r = getSecili();
         if (r == null) return;
@@ -347,17 +320,59 @@ public class AdminReservationManagerPage extends JFrame {
 
         List<String> kisiList = parseKisiler(r.getKisiler());
 
-        if (secim == 0) { // Kişi Ekle
+        if (secim == 0) { // Kişi Ekle (Sıralı ve Anlık Kontrol)
 
-            String ad = JOptionPane.showInputDialog(this, "Ad Soyad:");
-            if(ad == null) return; 
-            String tc = JOptionPane.showInputDialog(this, "TC:");
-            if(tc == null) return;
-            String dogum = JOptionPane.showInputDialog(this, "Doğum Tarihi (dd.MM.yyyy):");
-            if(dogum == null) return;
+            // 1. ADIM: İSİM GİRİŞİ VE KONTROLÜ
+            String ad = "";
+            while (true) {
+                ad = JOptionPane.showInputDialog(this, "Ad Soyad:");
+                if (ad == null) return; // İptal edildi
+                
+                if (ad.length() < 3 || !ad.matches("^[a-zA-ZçğıöşüÇĞİÖŞÜ\\s]+$")) {
+                    JOptionPane.showMessageDialog(this, 
+                        "Ad Soyad geçersiz! (Min 3 karakter, sadece harf)", "Hata", JOptionPane.ERROR_MESSAGE);
+                } else {
+                    break; // Geçerli, döngüden çık
+                }
+            }
 
-            if (!kisiBilgiDogrula(ad, tc, dogum)) return;
+            // 2. ADIM: TC GİRİŞİ VE KONTROLÜ
+            String tc = "";
+            while (true) {
+                tc = JOptionPane.showInputDialog(this, "TC Kimlik (11 Hane):");
+                if (tc == null) return;
 
+                if (!tc.matches("\\d{11}")) {
+                    JOptionPane.showMessageDialog(this, "TC 11 haneli rakam olmalıdır!", "Hata", JOptionPane.ERROR_MESSAGE);
+                    continue;
+                }
+                int lastDigit = Character.getNumericValue(tc.charAt(10));
+                if (lastDigit % 2 != 0) {
+                    JOptionPane.showMessageDialog(this, "TC son hanesi çift olmalıdır!", "Hata", JOptionPane.ERROR_MESSAGE);
+                    continue;
+                }
+                break; // Geçerli
+            }
+
+            // 3. ADIM: DOĞUM TARİHİ GİRİŞİ VE KONTROLÜ
+            String dogum = "";
+            while (true) {
+                dogum = JOptionPane.showInputDialog(this, "Doğum Tarihi (dd.MM.yyyy):");
+                if (dogum == null) return;
+
+                try {
+                    LocalDate d = LocalDate.parse(dogum, STRICT_DATE);
+                    if (d.isAfter(LocalDate.now())) {
+                        JOptionPane.showMessageDialog(this, "Doğum tarihi gelecekte olamaz!", "Hata", JOptionPane.ERROR_MESSAGE);
+                    } else {
+                        break; // Geçerli
+                    }
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(this, "Tarih formatı hatalı! (gg.aa.yyyy)", "Hata", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+
+            // Tüm kontroller geçtiyse ekle
             kisiList.add("Ad Soyad: " + ad + " | TC: " + tc + " | Doğum: " + dogum);
             r.setKisiSayisi(kisiList.size());
         }

@@ -56,7 +56,7 @@ public class UserMenu extends JFrame {
         // ✅ KART 1: Rezervasyon Oluştur
         JPanel pnlCreate = createDashboardCard(
                 "Rezervasyon Oluştur", 
-                "src/resources/calendar.jpg", 
+                "src/resources/rezervation.png", 
                 "Yeni bir tatil planlayın ve oda ayırtın.",
                 e -> new ReservationForm(kullaniciAdi).setVisible(true)
         );
@@ -165,7 +165,7 @@ public class UserMenu extends JFrame {
         card.add(txtDesc);
 
         // Buton
-        JButton btnAction = new ModernButton("Giriş Yap", PRIMARY_COLOR, Color.WHITE);
+        JButton btnAction = new ModernButton("İşlem Yap", PRIMARY_COLOR, Color.WHITE);
         btnAction.setBounds(50, 260, 180, 40);
         btnAction.addActionListener(action);
         card.add(btnAction);

@@ -220,12 +220,11 @@ public class ReservationForm extends JFrame {
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
     }
 
-    // --- MANTIK KISMI (AYNEN KORUNDU) ---
+    // --- MANTIK KISMI ---
 
     private LocalDate parseStrictDate(String dateStr) {
         try {
             LocalDate d = LocalDate.parse(dateStr, STRICT_DATE);
-            if (d.isBefore(LocalDate.now())) return null;
             return d;
         } catch (Exception e) {
             return null;
@@ -237,11 +236,9 @@ public class ReservationForm extends JFrame {
         int kisiSayisi = (int) kisiSayisiSecim.getSelectedItem();
 
         for (int i = 1; i <= kisiSayisi; i++) {
-            // Her kişi için bir "Kart" oluşturuyoruz
             JPanel card = new JPanel(new GridLayout(3, 2, 10, 10));
             card.setBackground(Color.WHITE);
             
-            // Şık bir çerçeve (TitledBorder)
             TitledBorder border = BorderFactory.createTitledBorder(
                     new LineBorder(new Color(200, 200, 200), 1, true),
                     i + ". Misafir Bilgileri"
@@ -251,7 +248,6 @@ public class ReservationForm extends JFrame {
             card.setBorder(BorderFactory.createCompoundBorder(border, new EmptyBorder(10, 10, 10, 10)));
             card.setMaximumSize(new Dimension(2000, 160)); // Yüksekliği sınırla
 
-            // Inputlar
             card.add(createLabel("Ad Soyad:"));
             card.add(createTextField());
 
@@ -272,13 +268,9 @@ public class ReservationForm extends JFrame {
     private String kisileriTopla() {
         StringBuilder sb = new StringBuilder();
 
-        // kisiContainerPanel içindeki bileşenler (JPanel kartları) arasında dönüyoruz
         for (Component c : kisiContainerPanel.getComponents()) {
-            if (c instanceof JPanel) { // Box.Glue olmayanlar
+            if (c instanceof JPanel) { 
                 JPanel card = (JPanel) c;
-                
-                // Kart içindeki bileşen sırası: Label, Field, Label, Field...
-                // index 1 -> Ad, index 3 -> TC, index 5 -> Doğum
                 
                 String ad = ((JTextField) card.getComponent(1)).getText().trim();
                 String tc = ((JTextField) card.getComponent(3)).getText().trim();
@@ -310,12 +302,89 @@ public class ReservationForm extends JFrame {
         fiyatLabel.setText((birimFiyat * kisi * gun) + " TL");
     }
 
+    // --- MİSAFİR VALİDASYONU (KORUNDU) ---
+    private String validateGuestInputs() {
+        int index = 1;
+        for (Component c : kisiContainerPanel.getComponents()) {
+            if (c instanceof JPanel) {
+                JPanel card = (JPanel) c;
+                
+                // Bileşenleri al
+                JTextField txtName = (JTextField) card.getComponent(1);
+                JTextField txtTC = (JTextField) card.getComponent(3);
+                JTextField txtBirth = (JTextField) card.getComponent(5);
+                
+                String name = txtName.getText().trim();
+                String tc = txtTC.getText().trim();
+                String birth = txtBirth.getText().trim();
+
+                // 1. BOŞ KONTROLÜ
+                if (name.isEmpty() || tc.isEmpty() || birth.isEmpty()) {
+                    return index + ". Misafir için tüm alanlar doldurulmalıdır.";
+                }
+
+                // 2. İSİM KONTROLÜ (Min 3 karakter, sadece harf ve boşluk)
+                if (name.length() < 3 || !name.matches("^[a-zA-ZçğıöşüÇĞİÖŞÜ\\s]+$")) {
+                    return index + ". Misafir Adı geçersiz! (En az 3 karakter olmalı ve sadece harf içermelidir)";
+                }
+
+                // 3. TC KONTROLÜ (11 hane, rakam, sonu çift)
+                if (!tc.matches("\\d{11}")) {
+                    return index + ". Misafir TC Kimlik No 11 haneli ve sadece rakam olmalıdır.";
+                }
+                int lastDigit = Character.getNumericValue(tc.charAt(10));
+                if (lastDigit % 2 != 0) {
+                    return index + ". Misafir TC Kimlik No son hanesi çift olmalıdır.";
+                }
+
+                // 4. DOĞUM TARİHİ KONTROLÜ (Gelecek tarih olamaz)
+                try {
+                    LocalDate birthDate = LocalDate.parse(birth, STRICT_DATE);
+                    if (birthDate.isAfter(LocalDate.now())) {
+                        return index + ". Misafir doğum tarihi bugünden sonraki bir tarih olamaz.";
+                    }
+                } catch (Exception e) {
+                    return index + ". Misafir doğum tarihi formatı hatalı (gg.aa.yyyy).";
+                }
+
+                index++;
+            }
+        }
+        return null; // Hata yoksa null döner
+    }
+
     private void rezervasyonOlustur() {
         LocalDate giris = parseStrictDate(girisTarihi.getText());
         LocalDate cikis = parseStrictDate(cikisTarihi.getText());
+        LocalDate bugun = LocalDate.now();
 
-        if (giris == null || cikis == null || cikis.isBefore(giris)) {
-            JOptionPane.showMessageDialog(this, "Lütfen geçerli giriş ve çıkış tarihleri giriniz!", "Hata", JOptionPane.WARNING_MESSAGE);
+        if (giris == null || cikis == null) {
+            JOptionPane.showMessageDialog(this, "Lütfen geçerli giriş ve çıkış tarihleri giriniz (dd.MM.yyyy)!", "Hata", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // 1. GEÇMİŞ TARİH KONTROLÜ
+        if (giris.isBefore(bugun)) {
+            JOptionPane.showMessageDialog(this, "Geçmiş bir tarihe rezervasyon yapılamaz!", "Tarih Hatası", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // 2. GİRİŞ-ÇIKIŞ MANTIĞI
+        if (cikis.isBefore(giris) || cikis.isEqual(giris)) {
+            JOptionPane.showMessageDialog(this, "Çıkış tarihi, giriş tarihinden en az 1 gün sonra olmalıdır.", "Tarih Hatası", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // 3. 6 AY KISITLAMASI (YENİ)
+        if (giris.isAfter(bugun.plusMonths(6))) {
+            JOptionPane.showMessageDialog(this, "En fazla 6 ay sonrasına rezervasyon yapabilirsiniz!", "İleri Tarih Sınırı", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // 4. 30 GÜN SÜRE KISITLAMASI (YENİ)
+        long gunSayisi = ChronoUnit.DAYS.between(giris, cikis);
+        if (gunSayisi > 30) {
+            JOptionPane.showMessageDialog(this, "Maksimum konaklama süresi 30 gündür.\nSeçilen süre: " + gunSayisi + " gün.", "Süre Sınırı", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -324,6 +393,14 @@ public class ReservationForm extends JFrame {
             JOptionPane.showMessageDialog(this, "Geçerli bir e-posta adresi giriniz!", "Hata", JOptionPane.WARNING_MESSAGE);
             return;
         }
+
+        // --- MİSAFİR BİLGİLERİ KONTROLÜ ---
+        String validationError = validateGuestInputs();
+        if (validationError != null) {
+            JOptionPane.showMessageDialog(this, validationError, "Eksik/Hatalı Bilgi", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        // ----------------------------------------
 
         String oda = (String) odaSecim.getSelectedItem();
 
