@@ -6,24 +6,17 @@ import model.Reservation;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.List;
 
 public class AdminRoomManagerPage extends JFrame {
 
-    // Oda Tipi Kartları (Custom Component)
     private RoomCard cardStandart;
     private RoomCard cardDeluxe;
     private RoomCard cardKral;
 
-    // Renk Paleti
     private final Color BG_COLOR = new Color(245, 247, 250);
-    private final Color PRIMARY_COLOR = new Color(63, 81, 181);
-
-    // --- ODA LİMİTİ ---
     private final int MAX_ROOM_LIMIT = 5;
 
     public AdminRoomManagerPage() {
@@ -31,276 +24,235 @@ public class AdminRoomManagerPage extends JFrame {
         setSize(1000, 650);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        
-        // Ana Scrollable Panel
+
         JPanel mainContainer = new JPanel();
         mainContainer.setLayout(new BoxLayout(mainContainer, BoxLayout.Y_AXIS));
         mainContainer.setBackground(BG_COLOR);
         mainContainer.setBorder(new EmptyBorder(30, 40, 30, 40));
 
-        // 1. Başlık Alanı
-        JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.setBackground(BG_COLOR);
-        headerPanel.setMaximumSize(new Dimension(2000, 60));
-        headerPanel.setBorder(new EmptyBorder(0, 0, 20, 0));
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(BG_COLOR);
+        header.setMaximumSize(new Dimension(2000, 70));
 
         JLabel lblTitle = new JLabel("Oda Durum Paneli");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 26));
         lblTitle.setForeground(new Color(50, 50, 50));
-        
+
         JLabel lblSub = new JLabel("Doluluk oranlarını inceleyin. (Her kategori için maks. " + MAX_ROOM_LIMIT + " oda)");
         lblSub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         lblSub.setForeground(Color.GRAY);
 
-        headerPanel.add(lblTitle, BorderLayout.NORTH);
-        headerPanel.add(lblSub, BorderLayout.SOUTH);
-        mainContainer.add(headerPanel);
+        header.add(lblTitle, BorderLayout.NORTH);
+        header.add(lblSub, BorderLayout.SOUTH);
 
-        // 2. Oda Kartlarının Oluşturulması
-        
-        // --- STANDART ODA ---
-        cardStandart = new RoomCard("Standart Oda", new Color(0, 150, 136)); // Teal Rengi
-        cardStandart.setAddAction(e -> {
-            if (checkLimit("Standart")) {
-                ReservationManager.yeniStandartOdaEkle();
-                guncelle();
-                showSuccessMsg("Standart");
-            }
-        });
+        mainContainer.add(header);
+        mainContainer.add(Box.createVerticalStrut(20));
+
+        // STANDART
+        cardStandart = new RoomCard("Standart Oda", new Color(0, 150, 136));
+        cardStandart.setActions(
+                () -> { // ekle
+                    if (ReservationManager.getStandartTotal() >= MAX_ROOM_LIMIT) {
+                        warn("Standart", "Maksimum oda limitine ulaşıldı!");
+                        return;
+                    }
+                    ReservationManager.yeniStandartOdaEkle();
+                    guncelle();
+                },
+                () -> { // sil (sadece boş)
+                    boolean ok = ReservationManager.standartOdaSil();
+                    if (!ok) warn("Standart", "Boş oda yok! Dolu odayı silemezsin.");
+                    guncelle();
+                }
+        );
         mainContainer.add(cardStandart);
-        mainContainer.add(Box.createVerticalStrut(20)); // Boşluk
+        mainContainer.add(Box.createVerticalStrut(20));
 
-        // --- DELUXE ODA ---
-        cardDeluxe = new RoomCard("Deluxe Oda", new Color(255, 152, 0)); // Turuncu
-        cardDeluxe.setAddAction(e -> {
-            if (checkLimit("Deluxe")) {
-                ReservationManager.yeniDeluxeOdaEkle();
-                guncelle();
-                showSuccessMsg("Deluxe");
-            }
-        });
+        // DELUXE
+        cardDeluxe = new RoomCard("Deluxe Oda", new Color(255, 152, 0));
+        cardDeluxe.setActions(
+                () -> {
+                    if (ReservationManager.getDeluxeTotal() >= MAX_ROOM_LIMIT) {
+                        warn("Deluxe", "Maksimum oda limitine ulaşıldı!");
+                        return;
+                    }
+                    ReservationManager.yeniDeluxeOdaEkle();
+                    guncelle();
+                },
+                () -> {
+                    boolean ok = ReservationManager.deluxeOdaSil();
+                    if (!ok) warn("Deluxe", "Boş oda yok! Dolu odayı silemezsin.");
+                    guncelle();
+                }
+        );
         mainContainer.add(cardDeluxe);
         mainContainer.add(Box.createVerticalStrut(20));
 
-        // --- KRAL DAİRESİ ---
-        cardKral = new RoomCard("Kral Dairesi", new Color(156, 39, 176)); // Mor
-        cardKral.setAddAction(e -> {
-            if (checkLimit("Kral")) {
-                ReservationManager.yeniKralOdaEkle();
-                guncelle();
-                showSuccessMsg("Kral");
-            }
-        });
+        // KRAL
+        cardKral = new RoomCard("Kral Dairesi", new Color(156, 39, 176));
+        cardKral.setActions(
+                () -> {
+                    if (ReservationManager.getKralTotal() >= MAX_ROOM_LIMIT) {
+                        warn("Kral", "Maksimum oda limitine ulaşıldı!");
+                        return;
+                    }
+                    ReservationManager.yeniKralOdaEkle();
+                    guncelle();
+                },
+                () -> {
+                    boolean ok = ReservationManager.kralOdaSil();
+                    if (!ok) warn("Kral", "Boş oda yok! Dolu odayı silemezsin.");
+                    guncelle();
+                }
+        );
         mainContainer.add(cardKral);
 
-        // ScrollPane İçine Al (Ekrana sığmazsa kaydırılsın)
-        JScrollPane scrollPane = new JScrollPane(mainContainer);
-        scrollPane.setBorder(null);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        setContentPane(scrollPane);
+        JScrollPane sp = new JScrollPane(mainContainer);
+        sp.setBorder(null);
+        sp.getVerticalScrollBar().setUnitIncrement(16);
+        setContentPane(sp);
 
-        // Verileri Yükle
         guncelle();
     }
 
-    private void showSuccessMsg(String tur) {
-        JOptionPane.showMessageDialog(this, "Yeni " + tur + " oda sisteme eklendi!", "İşlem Başarılı", JOptionPane.INFORMATION_MESSAGE);
+    private void warn(String title, String msg) {
+        JOptionPane.showMessageDialog(this, msg, title, JOptionPane.WARNING_MESSAGE);
     }
 
-    // 
-    // ✅ ODA LİMİT KONTROLÜ (YENİ EKLENDİ)
-    private boolean checkLimit(String odaTipi) {
-        int mevcutSayi = getMevcutOdaSayisi(odaTipi);
-        
-        if (mevcutSayi >= MAX_ROOM_LIMIT) {
-            JOptionPane.showMessageDialog(this, 
-                "Bu kategoride maksimum " + MAX_ROOM_LIMIT + " oda sınırına ulaşıldı!\nDaha fazla ekleyemezsiniz.", 
-                "Kapasite Dolu", 
-                JOptionPane.WARNING_MESSAGE);
-            return false; // Ekleme yapma
-        }
-        return true; // Ekleme yapabilirsin
+    private boolean isActiveStatus(String durum) {
+        return durum != null && (durum.equals("Bekliyor") || durum.equals("Onaylandı"));
     }
 
-    // ✅ YARDIMCI METOT: TOPLAM ODA SAYISINI HESAPLAR
-    private int getMevcutOdaSayisi(String tip) {
-        // 1. Boş Oda Sayısı
-        int bos = 0;
-        if (tip.equals("Standart")) bos = ReservationManager.getStandartKalan();
-        else if (tip.equals("Deluxe")) bos = ReservationManager.getDeluxeKalan();
-        else if (tip.equals("Kral")) bos = ReservationManager.getKralKalan();
-
-        // 2. Dolu Oda Sayısı (Rezervasyonlardan sayılır)
-        int dolu = 0;
-        for (Reservation r : ReservationManager.getReservations()) {
-            if (r != null && (r.getDurum().equals("Bekliyor") || r.getDurum().equals("Onaylandı"))) {
-                if (r.getOdaTipi().contains(tip)) {
-                    dolu++;
-                }
-            }
-        }
-        return bos + dolu;
-    }
-
-    // ✅ BOŞ & DOLU ODALARI DOĞRU ŞEKİLDE GÖSTERİR
     private void guncelle() {
+        updateCard(cardStandart, "Standart",
+                ReservationManager.getStandartTotal(),
+                ReservationManager.getStandartKalan());
 
-        // 1. Verileri Çek
-        int bosStandart = ReservationManager.getStandartKalan();
-        int bosDeluxe = ReservationManager.getDeluxeKalan();
-        int bosKral = ReservationManager.getKralKalan();
+        updateCard(cardDeluxe, "Deluxe",
+                ReservationManager.getDeluxeTotal(),
+                ReservationManager.getDeluxeKalan());
 
-        List<Integer> doluStandart = new ArrayList<>();
-        List<Integer> doluDeluxe = new ArrayList<>();
-        List<Integer> doluKral = new ArrayList<>();
+        updateCard(cardKral, "Kral",
+                ReservationManager.getKralTotal(),
+                ReservationManager.getKralKalan());
+    }
 
+    private void updateCard(RoomCard card, String tip, int total, int empty) {
+        List<Integer> dolu = new ArrayList<>();
         for (Reservation r : ReservationManager.getReservations()) {
             if (r == null) continue;
-            if (r.getDurum().equals("Bekliyor") || r.getDurum().equals("Onaylandı")) {
-                if (r.getOdaTipi().contains("Standart")) doluStandart.add(r.getOdaNo());
-                if (r.getOdaTipi().contains("Deluxe")) doluDeluxe.add(r.getOdaNo());
-                if (r.getOdaTipi().contains("Kral")) doluKral.add(r.getOdaNo());
+            if (!isActiveStatus(r.getDurum())) continue; // iptal/red/bitti -> boş say
+            if (r.getOdaTipi() != null && r.getOdaTipi().contains(tip)) {
+                dolu.add(r.getOdaNo());
             }
         }
-
-        // 2. Toplam Oda Sayıları
-        int topStandart = bosStandart + doluStandart.size();
-        int topDeluxe   = bosDeluxe + doluDeluxe.size();
-        int topKral     = bosKral + doluKral.size();
-
-        // 3. Kartları Güncelle
-        cardStandart.updateData(topStandart, bosStandart, doluStandart);
-        cardDeluxe.updateData(topDeluxe, bosDeluxe, doluDeluxe);
-        cardKral.updateData(topKral, bosKral, doluKral);
+        card.updateData(total, empty, dolu);
     }
 
-    // =================================================================
-    // 🎨 CUSTOM UI: MODERN ODA KARTI PANELİ (REUSABLE COMPONENT)
-    // =================================================================
+    // ================= ROOM CARD =================
     class RoomCard extends JPanel {
-        private JLabel lblTitle;
-        private JLabel lblStats; // "Boş: 5 / Toplam: 10"
-        private JProgressBar progressBar;
-        private JTextArea areaOccupied;
-        private JButton btnAdd;
-        private Color themeColor;
+        private JLabel lblStats;
+        private JProgressBar bar;
+        private JTextArea area;
+        private ModernButton btnAdd, btnRemove;
 
-        public RoomCard(String title, Color themeColor) {
-            this.themeColor = themeColor;
-            setLayout(new BorderLayout(20, 0));
+        RoomCard(String title, Color color) {
+            setLayout(new BorderLayout(15, 10));
             setBackground(Color.WHITE);
             setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(new Color(230, 230, 230), 1),
                     new EmptyBorder(20, 20, 20, 20)
             ));
-            setMaximumSize(new Dimension(2000, 180)); // Kart yüksekliği
+            setMaximumSize(new Dimension(2000, 190));
 
-            // --- SOL TARAFI: BAŞLIK VE BUTON ---
-            JPanel leftPanel = new JPanel(new GridLayout(3, 1, 0, 10));
-            leftPanel.setBackground(Color.WHITE);
-            leftPanel.setPreferredSize(new Dimension(250, 0));
-
-            lblTitle = new JLabel(title);
+            JLabel lblTitle = new JLabel(title);
             lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 20));
-            lblTitle.setForeground(themeColor);
-
-            btnAdd = new ModernButton("+ Oda Ekle", themeColor);
+            lblTitle.setForeground(color);
 
             lblStats = new JLabel("Veri bekleniyor...");
             lblStats.setFont(new Font("Segoe UI", Font.BOLD, 14));
             lblStats.setForeground(Color.GRAY);
 
-            leftPanel.add(lblTitle);
-            leftPanel.add(lblStats);
-            leftPanel.add(btnAdd);
-            add(leftPanel, BorderLayout.WEST);
+            btnAdd = new ModernButton("+ Oda Ekle", color);
+            btnRemove = new ModernButton("- Boş Oda Sil", new Color(120, 120, 120));
 
-            // --- ORTA TARAF: PROGRESS BAR VE LİSTE ---
-            JPanel centerPanel = new JPanel(new BorderLayout(0, 10));
-            centerPanel.setBackground(Color.WHITE);
+            JPanel left = new JPanel(new GridLayout(4, 1, 0, 8));
+            left.setBackground(Color.WHITE);
+            left.setPreferredSize(new Dimension(260, 0));
+            left.add(lblTitle);
+            left.add(lblStats);
+            left.add(btnAdd);
+            left.add(btnRemove);
 
-            // Doluluk Barı
-            progressBar = new JProgressBar(0, MAX_ROOM_LIMIT); // Max değer limit olarak ayarlandı
-            progressBar.setStringPainted(true);
-            progressBar.setFont(new Font("Segoe UI", Font.BOLD, 12));
-            progressBar.setForeground(themeColor);
-            progressBar.setBackground(new Color(240, 240, 240));
-            progressBar.setBorderPainted(false);
-            centerPanel.add(progressBar, BorderLayout.NORTH);
+            bar = new JProgressBar(0, MAX_ROOM_LIMIT);
+            bar.setStringPainted(true);
+            bar.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            bar.setBorderPainted(false);
+            bar.setBackground(new Color(240, 240, 240));
 
-            // Dolu Oda Listesi
-            JLabel lblListHeader = new JLabel("Dolu Oda Numaraları:");
-            lblListHeader.setFont(new Font("Segoe UI", Font.BOLD, 12));
-            
-            areaOccupied = new JTextArea();
-            areaOccupied.setFont(new Font("Consolas", Font.PLAIN, 13));
-            areaOccupied.setForeground(new Color(60, 60, 60));
-            areaOccupied.setLineWrap(true);
-            areaOccupied.setWrapStyleWord(true);
-            areaOccupied.setEditable(false);
-            areaOccupied.setBackground(new Color(250, 250, 250));
-            areaOccupied.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+            area = new JTextArea();
+            area.setEditable(false);
+            area.setLineWrap(true);
+            area.setWrapStyleWord(true);
+            area.setFont(new Font("Consolas", Font.PLAIN, 13));
+            area.setBackground(new Color(250, 250, 250));
+            area.setBorder(new EmptyBorder(8, 8, 8, 8));
 
-            JPanel listWrapper = new JPanel(new BorderLayout());
-            listWrapper.setBackground(Color.WHITE);
-            listWrapper.add(lblListHeader, BorderLayout.NORTH);
-            listWrapper.add(new JScrollPane(areaOccupied), BorderLayout.CENTER);
-            
-            centerPanel.add(listWrapper, BorderLayout.CENTER);
-            add(centerPanel, BorderLayout.CENTER);
+            JPanel center = new JPanel(new BorderLayout(0, 8));
+            center.setBackground(Color.WHITE);
+            center.add(bar, BorderLayout.NORTH);
+            center.add(new JScrollPane(area), BorderLayout.CENTER);
+
+            add(left, BorderLayout.WEST);
+            add(center, BorderLayout.CENTER);
         }
 
-        public void setAddAction(java.awt.event.ActionListener action) {
-            btnAdd.addActionListener(action);
+        void setActions(Runnable add, Runnable remove) {
+            btnAdd.addActionListener(e -> add.run());
+            btnRemove.addActionListener(e -> remove.run());
         }
 
-        public void updateData(int total, int empty, List<Integer> occupiedList) {
-            int occupiedCount = occupiedList.size();
-            
-            // İstatistik Yazısı
-            lblStats.setText("<html>Boş: <font color='green'>" + empty + "</font> | Toplam: " + total + "/" + MAX_ROOM_LIMIT + "</html>");
+        void updateData(int total, int empty, List<Integer> occupied) {
+            lblStats.setText("Boş: " + empty + " | Toplam: " + total + "/" + MAX_ROOM_LIMIT);
+            bar.setValue(total);
+            bar.setString("Kapasite: " + total + " / " + MAX_ROOM_LIMIT);
 
-            // Progress Bar (Doluluk Oranı yerine Kapasite Kullanımı)
-            // Burada bar'ın doluluğu toplam oda sayısını gösterir
-            progressBar.setValue(total); 
-            progressBar.setString("Kapasite Kullanımı: " + total + " / " + MAX_ROOM_LIMIT);
-
-            // Oda ekleme butonu kontrolü (5'e ulaştıysa pasif yap veya uyarı ver)
-            // İsteğe bağlı: Butonu pasif yapmak istersen aşağıdaki satırı aç
-            // btnAdd.setEnabled(total < MAX_ROOM_LIMIT);
-
-            // Dolu Oda Listesi
-            if (occupiedList.isEmpty()) {
-                areaOccupied.setText("- Şu an tüm odalar boş -");
-                areaOccupied.setForeground(Color.GRAY);
+            if (occupied.isEmpty()) {
+                area.setForeground(Color.GRAY);
+                area.setText("- Aktif rezervasyon yok (hepsi boş sayılır) -");
             } else {
-                areaOccupied.setText(occupiedList.toString()); 
-                areaOccupied.setForeground(new Color(60, 60, 60));
+                area.setForeground(new Color(60, 60, 60));
+                area.setText("Dolu oda numaraları: " + occupied);
             }
+
+            // İstersen butonu otomatik pasifle:
+            // btnAdd.setEnabled(total < MAX_ROOM_LIMIT);
+            // btnRemove.setEnabled(empty > 0);
         }
     }
 
-    // --- MODERN BUTON SINIFI ---
+    // ================= MODERN BUTTON =================
     class ModernButton extends JButton {
-        private Color baseColor;
-        public ModernButton(String text, Color bg) {
-            super(text);
-            this.baseColor = bg;
-            setFont(new Font("Segoe UI", Font.BOLD, 13));
+        private final Color c;
+
+        ModernButton(String t, Color c) {
+            super(t);
+            this.c = c;
             setForeground(Color.WHITE);
+            setFont(new Font("Segoe UI", Font.BOLD, 13));
             setContentAreaFilled(false);
             setFocusPainted(false);
             setBorderPainted(false);
             setCursor(new Cursor(Cursor.HAND_CURSOR));
+            setPreferredSize(new Dimension(160, 34));
         }
+
         @Override
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            if (getModel().isPressed()) g2.setColor(baseColor.darker());
-            else if (getModel().isRollover()) g2.setColor(baseColor.brighter());
-            else g2.setColor(baseColor);
-            g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
+            g2.setColor(getModel().isPressed() ? c.darker() : c);
+            g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 10, 10));
             g2.dispose();
             super.paintComponent(g);
         }

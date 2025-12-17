@@ -9,6 +9,11 @@ import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
+
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -20,9 +25,8 @@ public class AdminCustomerSearchPage extends JFrame {
     private DefaultTableModel model;
     private JTable table;
 
-    // Renk Paleti
-    private final Color PRIMARY_COLOR = new Color(63, 81, 181); // İndigo
-    private final Color BG_COLOR = new Color(245, 247, 250);    // Açık Gri Arka Plan
+    private final Color PRIMARY_COLOR = new Color(63, 81, 181);
+    private final Color BG_COLOR = new Color(245, 247, 250);
     private final Font MAIN_FONT = new Font("Segoe UI", Font.PLAIN, 14);
 
     public AdminCustomerSearchPage() {
@@ -31,23 +35,19 @@ public class AdminCustomerSearchPage extends JFrame {
         setSize(1000, 600);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        
-        // Ana Panel
+
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(BG_COLOR);
         setContentPane(mainPanel);
 
-        // ------- 1. ÜST ARAMA PANELİ (HEADER) -------
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBackground(BG_COLOR);
         topPanel.setBorder(new EmptyBorder(20, 30, 20, 30));
 
-        // Başlık Kısmı
         JLabel lblTitle = new JLabel("Müşteri Kayıtları");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
         lblTitle.setForeground(new Color(50, 50, 50));
-        
-        // Arama Kutusu Paneli
+
         JPanel searchContainer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         searchContainer.setOpaque(false);
 
@@ -57,6 +57,10 @@ public class AdminCustomerSearchPage extends JFrame {
 
         txtName = new JTextField(20);
         styleTextField(txtName);
+        txtName.setToolTipText("En fazla 30 karakter. Sadece harf ve boşluk.");
+
+        // ✅ 30 karakter + sadece harf/boşluk (tam metin kontrolü)
+        ((AbstractDocument) txtName.getDocument()).setDocumentFilter(new NameStrictFilter(30));
 
         JButton btnSearch = new JButton("Ara");
         styleButton(btnSearch);
@@ -68,20 +72,15 @@ public class AdminCustomerSearchPage extends JFrame {
 
         topPanel.add(lblTitle, BorderLayout.WEST);
         topPanel.add(searchContainer, BorderLayout.EAST);
-
         mainPanel.add(topPanel, BorderLayout.NORTH);
 
-        // ------- 2. TABLO -------
         setupTable();
-        
-        // Tabloyu ScrollPane içine al (Kenarlıksız)
+
         JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(new EmptyBorder(0, 30, 30, 30)); // Yanlardan boşluk
+        scrollPane.setBorder(new EmptyBorder(0, 30, 30, 30));
         scrollPane.getViewport().setBackground(Color.WHITE);
-        
         mainPanel.add(scrollPane, BorderLayout.CENTER);
-        
-        // Enter tuşuna basınca arama yapsın
+
         getRootPane().setDefaultButton(btnSearch);
     }
 
@@ -98,7 +97,6 @@ public class AdminCustomerSearchPage extends JFrame {
             }
         };
 
-        // Tablo Görsel Ayarları
         table.setFont(MAIN_FONT);
         table.setRowHeight(35);
         table.setShowVerticalLines(false);
@@ -106,40 +104,44 @@ public class AdminCustomerSearchPage extends JFrame {
         table.setSelectionBackground(new Color(232, 240, 254));
         table.setSelectionForeground(Color.BLACK);
 
-        // Header Tasarımı
         JTableHeader header = table.getTableHeader();
         header.setFont(new Font("Segoe UI", Font.BOLD, 14));
         header.setBackground(PRIMARY_COLOR);
         header.setForeground(Color.WHITE);
         header.setPreferredSize(new Dimension(0, 40));
 
-        // Hücreleri Ortala
-        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
-        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        DefaultTableCellRenderer center = new DefaultTableCellRenderer();
+        center.setHorizontalAlignment(JLabel.CENTER);
         for (int i = 0; i < table.getColumnCount(); i++) {
-            table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+            table.getColumnModel().getColumn(i).setCellRenderer(center);
         }
-        
-        // "Durum" sütunu için özel renklendirme (Son sütun)
+
         table.getColumnModel().getColumn(7).setCellRenderer(new DefaultTableCellRenderer() {
             @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                String status = (String) value;
+            public Component getTableCellRendererComponent(
+                    JTable table, Object value, boolean isSelected,
+                    boolean hasFocus, int row, int column) {
+
+                Component c = super.getTableCellRendererComponent(
+                        table, value, isSelected, hasFocus, row, column);
+
                 setHorizontalAlignment(CENTER);
                 setFont(new Font("Segoe UI", Font.BOLD, 12));
-                
-                if ("Onaylandı".equalsIgnoreCase(status)) setForeground(new Color(46, 125, 50));
-                else if ("Bekliyor".equalsIgnoreCase(status)) setForeground(new Color(255, 143, 0));
-                else if ("İptal Edildi".equalsIgnoreCase(status)) setForeground(Color.RED);
-                else setForeground(Color.GRAY);
-                
+
+                String status = String.valueOf(value);
+                if ("Onaylandı".equalsIgnoreCase(status))
+                    setForeground(new Color(46, 125, 50));
+                else if ("Bekliyor".equalsIgnoreCase(status))
+                    setForeground(new Color(255, 143, 0));
+                else if ("İptal Edildi".equalsIgnoreCase(status))
+                    setForeground(Color.RED);
+                else
+                    setForeground(Color.GRAY);
+
                 return c;
             }
         });
     }
-
-    // ------- YARDIMCI METODLAR (STİL) -------
 
     private void styleTextField(JTextField field) {
         field.setPreferredSize(new Dimension(200, 35));
@@ -158,36 +160,41 @@ public class AdminCustomerSearchPage extends JFrame {
         btn.setFocusPainted(false);
         btn.setBorder(BorderFactory.createEmptyBorder());
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        
-        // Hover Efekti
+
         btn.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) { btn.setBackground(PRIMARY_COLOR.brighter()); }
-            public void mouseExited(MouseEvent e) { btn.setBackground(PRIMARY_COLOR); }
+            public void mouseExited(MouseEvent e)  { btn.setBackground(PRIMARY_COLOR); }
         });
     }
 
-    // ------- MANTIK (DEĞİŞMEDİ) -------
-    // ✅ SADECE İSİME GÖRE ARAMA
+    // ✅ SADECE HARF/BOŞLUK + 30 KARAKTER: Son kontrol ve tek popup burada
     private void ara() {
-        String nameQuery = txtName.getText().trim().toLowerCase();
-
-        model.setRowCount(0); // tabloyu temizle
+        String nameQuery = txtName.getText().trim();
 
         if (nameQuery.isEmpty()) {
             JOptionPane.showMessageDialog(this,
                     "Lütfen müşteri adı giriniz!",
-                    "Uyarı",
-                    JOptionPane.WARNING_MESSAGE);
+                    "Uyarı", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        List<Reservation> list = ReservationManager.searchByName(nameQuery);
+        // Tam metin doğrulama (filtreyi by-pass eden durumlara karşı)
+        if (!nameQuery.matches("[\\p{L} ]{1,30}")) {
+            JOptionPane.showMessageDialog(this,
+                    "Sadece harf ve boşluk girebilirsin (maksimum 30 karakter).",
+                    "Hatalı Giriş",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        model.setRowCount(0);
+
+        List<Reservation> list = ReservationManager.searchByName(nameQuery.toLowerCase());
 
         if (list.isEmpty()) {
             JOptionPane.showMessageDialog(this,
                     "Bu isme ait müşteri bulunamadı.",
-                    "Bilgi",
-                    JOptionPane.INFORMATION_MESSAGE);
+                    "Bilgi", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
@@ -202,6 +209,56 @@ public class AdminCustomerSearchPage extends JFrame {
                     r.getFiyat(),
                     r.getDurum()
             });
+        }
+    }
+
+    // 🔒 Tam metin kontrolü yapan filtre: hem uzunluk hem karakter seti
+    private static class NameStrictFilter extends DocumentFilter {
+        private final int max;
+
+        NameStrictFilter(int max) { this.max = max; }
+
+        private boolean isValidFullText(String fullText) {
+            if (fullText == null) return false;
+            if (fullText.length() > max) return false;
+            // İzin verilen: harf + boşluk. (Türkçe dahil)
+            return fullText.matches("[\\p{L} ]*");
+        }
+
+        private void reject() {
+            Toolkit.getDefaultToolkit().beep();
+        }
+
+        @Override
+        public void insertString(FilterBypass fb, int offset, String text, AttributeSet attr)
+                throws BadLocationException {
+            if (text == null) return;
+
+            String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+            String candidate = new StringBuilder(current).insert(offset, text).toString();
+
+            if (!isValidFullText(candidate)) {
+                reject();
+                return;
+            }
+            super.insertString(fb, offset, text, attr);
+        }
+
+        @Override
+        public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs)
+                throws BadLocationException {
+            if (text == null) text = "";
+
+            String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+            StringBuilder sb = new StringBuilder(current);
+            sb.replace(offset, offset + length, text);
+            String candidate = sb.toString();
+
+            if (!isValidFullText(candidate)) {
+                reject();
+                return;
+            }
+            super.replace(fb, offset, length, text, attrs);
         }
     }
 }
